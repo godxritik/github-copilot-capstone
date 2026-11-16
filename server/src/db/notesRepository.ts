@@ -231,6 +231,50 @@ export class NotesRepository {
     this.db.prepare('DELETE FROM notes WHERE id = ?').run(id);
   }
 
+  /**
+   * Relinks neighbors when a note is being deleted (Architecture §6 Rules N-08, Option 1).
+   * Relinking changes only link fields, preserving neighbors' updatedAt (D-05).
+   */
+  relinkNeighbors(continuedFromId: string | null, continuedInId: string | null): void {
+    if (continuedFromId && continuedInId) {
+      // Middle note: bridge previous and next
+      this.db
+        .prepare('UPDATE notes SET continued_in_id = ? WHERE id = ?')
+        .run(continuedInId, continuedFromId);
+      this.db
+        .prepare('UPDATE notes SET continued_from_id = ? WHERE id = ?')
+        .run(continuedFromId, continuedInId);
+    } else if (!continuedFromId && continuedInId) {
+      // Head note: clear next note's continuedFromId
+      this.db
+        .prepare('UPDATE notes SET continued_from_id = NULL WHERE id = ?')
+        .run(continuedInId);
+    } else if (continuedFromId && !continuedInId) {
+      // Tail note: clear previous note's continuedInId
+      this.db
+        .prepare('UPDATE notes SET continued_in_id = NULL WHERE id = ?')
+        .run(continuedFromId);
+    }
+  }
+
+  /**
+   * Delete a note and relink its overflow neighbours in one transaction (Architecture §6 Rules).
+   * Returns true if note existed and was deleted, false otherwise.
+   */
+  deleteWithRelinking(id: string): boolean {
+    return this.runInTransaction(() => {
+      const note = this.db
+        .prepare('SELECT continued_from_id, continued_in_id FROM notes WHERE id = ?')
+        .get(id) as { continued_from_id: string | null; continued_in_id: string | null } | undefined;
+
+      if (!note) return false;
+
+      this.relinkNeighbors(note.continued_from_id, note.continued_in_id);
+      this.deleteById(id);
+      return true;
+    });
+  }
+
   /** Run an arbitrary function inside a single database transaction. */
   runInTransaction<T>(fn: () => T): T {
     return this.db.transaction(fn)();

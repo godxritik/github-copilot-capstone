@@ -59,10 +59,10 @@
     "implementation": {
       "agent": "implementation-agent",
       "status": "approved",
-      "canWriteFiles": ["client/**", "server/**"],
+      "canWriteFiles": ["client/**", "server/**", "progress.md"],
       "canRunCommands": true,
       "canInstallDependencies": true,
-      "requiresApprovalPerTask": true,
+      "requiresApprovalPerTask": false,
       "requiresApprovalToComplete": true,
       "approvedBy": "user",
       "dependsOn": "planning",

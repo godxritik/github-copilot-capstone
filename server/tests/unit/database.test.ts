@@ -169,4 +169,86 @@ describe('Database initialization', () => {
     // Should have the same tables (not created twice)
     expect(tables2.count).toBe(tables1.count);
   });
+
+  it('should enforce UNIQUE constraint on (note_id, position)', () => {
+    db = initializeDatabase(dbPath);
+    const now = new Date().toISOString();
+    db.prepare('INSERT INTO notes (id, created_at, updated_at) VALUES (?, ?, ?)').run(
+      'note-1',
+      now,
+      now
+    );
+    db.prepare('INSERT INTO checklist_items (note_id, position, text) VALUES (?, ?, ?)').run(
+      'note-1',
+      0,
+      'First item'
+    );
+
+    expect(() =>
+      db
+        .prepare('INSERT INTO checklist_items (note_id, position, text) VALUES (?, ?, ?)')
+        .run('note-1', 0, 'Duplicate position item')
+    ).toThrow();
+  });
+
+  it('should enforce CHECK constraint on is_pinned and is_archived', () => {
+    db = initializeDatabase(dbPath);
+    const now = new Date().toISOString();
+    expect(() =>
+      db
+        .prepare(
+          'INSERT INTO notes (id, is_pinned, created_at, updated_at) VALUES (?, ?, ?, ?)'
+        )
+        .run('note-invalid-pin', 2, now, now)
+    ).toThrow();
+
+    expect(() =>
+      db
+        .prepare(
+          'INSERT INTO notes (id, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?)'
+        )
+        .run('note-invalid-archived', -1, now, now)
+    ).toThrow();
+  });
+
+  it('should enforce CHECK constraint on checklist_items text length (<= 80)', () => {
+    db = initializeDatabase(dbPath);
+    const now = new Date().toISOString();
+    db.prepare('INSERT INTO notes (id, created_at, updated_at) VALUES (?, ?, ?)').run(
+      'note-cl-check',
+      now,
+      now
+    );
+    const longText = 'x'.repeat(81);
+    expect(() =>
+      db
+        .prepare('INSERT INTO checklist_items (note_id, position, text) VALUES (?, ?, ?)')
+        .run('note-cl-check', 0, longText)
+    ).toThrow();
+  });
+
+  it('should SET NULL on continued_from_id and continued_in_id when linked note is deleted', () => {
+    db = initializeDatabase(dbPath);
+    const now = new Date().toISOString();
+    db.prepare('INSERT INTO notes (id, created_at, updated_at) VALUES (?, ?, ?)').run(
+      'orig-note',
+      now,
+      now
+    );
+    db.prepare(
+      'INSERT INTO notes (id, created_at, updated_at, continued_from_id) VALUES (?, ?, ?, ?)'
+    ).run('overflow-note', now, now, 'orig-note');
+    db.prepare('UPDATE notes SET continued_in_id = ? WHERE id = ?').run(
+      'overflow-note',
+      'orig-note'
+    );
+
+    // Delete original note
+    db.prepare('DELETE FROM notes WHERE id = ?').run('orig-note');
+
+    const overflowNote = db
+      .prepare('SELECT continued_from_id, continued_in_id FROM notes WHERE id = ?')
+      .get('overflow-note');
+    expect(overflowNote.continued_from_id).toBeNull();
+  });
 });

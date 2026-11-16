@@ -230,4 +230,61 @@ describe('NotesRepository', () => {
     }).toThrow('boom');
     expect(repo.findById('n1')!.title).toBe('Original');
   });
+
+  describe('Neighbor relinking on delete (N-08, Option 1)', () => {
+    it('relinks middle note deletion: bridges previous and next notes without altering their updatedAt', () => {
+      const fixedTime = '2026-01-01T12:00:00.000Z';
+      repo.insertNote(makeNoteInput({ id: 'head', updatedAt: fixedTime }));
+      repo.insertNote(makeNoteInput({ id: 'mid', continuedFromId: 'head', updatedAt: fixedTime }));
+      repo.insertNote(makeNoteInput({ id: 'tail', continuedFromId: 'mid', updatedAt: fixedTime }));
+
+      repo.updateFields('head', { continuedInId: 'mid' });
+      repo.updateFields('mid', { continuedInId: 'tail' });
+
+      const deleted = repo.deleteWithRelinking('mid');
+      expect(deleted).toBe(true);
+      expect(repo.findById('mid')).toBeNull();
+
+      const head = repo.findById('head')!;
+      const tail = repo.findById('tail')!;
+
+      expect(head.continuedInId).toBe('tail');
+      expect(head.updatedAt).toBe(fixedTime); // D-05: updatedAt unchanged
+
+      expect(tail.continuedFromId).toBe('head');
+      expect(tail.updatedAt).toBe(fixedTime); // D-05: updatedAt unchanged
+    });
+
+    it('relinks head note deletion: clears next note continuedFromId', () => {
+      const fixedTime = '2026-01-01T12:00:00.000Z';
+      repo.insertNote(makeNoteInput({ id: 'head', updatedAt: fixedTime }));
+      repo.insertNote(makeNoteInput({ id: 'tail', continuedFromId: 'head', updatedAt: fixedTime }));
+      repo.updateFields('head', { continuedInId: 'tail' });
+
+      repo.deleteWithRelinking('head');
+      expect(repo.findById('head')).toBeNull();
+
+      const tail = repo.findById('tail')!;
+      expect(tail.continuedFromId).toBeNull();
+      expect(tail.updatedAt).toBe(fixedTime);
+    });
+
+    it('relinks tail note deletion: clears previous note continuedInId', () => {
+      const fixedTime = '2026-01-01T12:00:00.000Z';
+      repo.insertNote(makeNoteInput({ id: 'head', updatedAt: fixedTime }));
+      repo.insertNote(makeNoteInput({ id: 'tail', continuedFromId: 'head', updatedAt: fixedTime }));
+      repo.updateFields('head', { continuedInId: 'tail' });
+
+      repo.deleteWithRelinking('tail');
+      expect(repo.findById('tail')).toBeNull();
+
+      const head = repo.findById('head')!;
+      expect(head.continuedInId).toBeNull();
+      expect(head.updatedAt).toBe(fixedTime);
+    });
+
+    it('deleteWithRelinking returns false when note does not exist', () => {
+      expect(repo.deleteWithRelinking('non-existent-id')).toBe(false);
+    });
+  });
 });

@@ -224,7 +224,8 @@ The architecture covers every MVP requirement (FR-01 to FR-13, FR-22, NFR-01 to 
 - The Section 6 items below that are marked open are not yet reflected in the saved architecture. They are reported as open, not resolved.
 - This review does not modify `docs/architecture.md`.
 
-### 7.2 Status of Section 6 Findings in the Saved Architecture
+### 7.2 Status of Section 6 Findings in the Saved Architecture (v0.2, superseded)
+Historical snapshot of architecture v0.2. Current status is in Sections 7.8 to 7.10 (v0.4), so do not use this table as current.
 | ID | Status | Evidence in the saved architecture |
 |---|---|---|
 | N-01 | Open (Major) | The POST row and validation table still reject a duplicate `id` with 400. No idempotent-retry rule exists. |
@@ -429,5 +430,80 @@ Once the Architect applies the agreed items, the Design Review Agent re-checks t
 - MVP scope: no new Future feature appears in the design.
 
 ### Decisions status
-- No new decision has been agreed. P-01 to P-09 are pending the Architect and user.
+- Agreed by the user on 2026-11-16 ("accept all defaults"). These are the decisions the Architect must apply to `docs/architecture.md`:
+  - **P-02 (Major):** overflow `POST` takes a client UUID `id`. An identical retry returns 200 with the stored `{ note, original }`. A conflicting retry or a duplicate `id` returns 400 `VALIDATION_ERROR`. The client keeps the overflow request as a draft, retries it with the latest original state, and clears it on 200 or 201.
+  - **P-01:** a per-action table in Section 8 gives send timing, rollback on failure, and Toast feedback for checklist, pin, color, and archive actions. Drafts apply only to text fields.
+  - **P-03:** archive is per note. `continuedFromId` and `continuedInId` are unchanged on archive and unarchive. A chain may span active and archived views.
+  - **P-04:** Section 11 drops the "20 Mbps, 50 ms" reference. The test environment is stated in Section 11 instead.
+  - **P-05:** NFR-02 is verified by a browser test from input event to rendered results with 500 notes. NFR-01 names the measurement tool, and the unit test is a supporting check only.
+  - **P-06:** Section 8 states that the client runs on `http://localhost` or HTTPS. The NFR-08 browser test checks note creation on that origin.
+  - **P-07:** a stored draft older than the server copy requires confirmation before it is applied. Drafts are cleared on 404 or note deletion. This replaces last-write-wins on load for drafts only; A-07 still applies to concurrent edits.
+  - **P-08:** a checklist PATCH replaces the note's items in one transaction (Section 7).
+  - **P-09:** `HOST` is removed from the MVP. The API always binds to `127.0.0.1`.
+- Pending: the Architect applies these decisions to `docs/architecture.md`. Then the Design Review Agent re-checks them and closes P-01 to P-09. Planning remains blocked until P-02 is closed.
 - Completion approval for the design-review phase is still the user's decision in `approvals.json`, and it is not recorded here.
+- Completion approval for the design-review phase is still the user's decision in `approvals.json`, and it is not recorded here.
+
+## 7.12 Round 3 Re-Check of Architecture v0.5 (2026-11-16)
+Scope: `docs/architecture.md` v0.5 checked against the accepted P-01 to P-09 decisions (Section 7.11, "accept all defaults"). Read-only check of the architecture; this agent did not edit it.
+
+### Status of P-01 to P-09
+| ID | Status | Evidence in v0.5 |
+|---|---|---|
+| P-01 | Resolved, with minor gap R3-03 | Section 8 per-action table (send timing, rollback, feedback); drafts limited to text |
+| P-02 | Open (Major), see R3-01 | Section 6 overflow `id` and P-02 rules exist, but rule order blocks the identical retry |
+| P-03 | Resolved | Section 6 "Archive is per note"; links unchanged on archive and unarchive |
+| P-04 | Resolved | Section 11 "Test environment" replaces the 20 Mbps and 50 ms reference |
+| P-05 | Resolved | Section 11 Playwright tests for NFR-01 and NFR-02, with unit tests as supporting checks |
+| P-06 | Resolved | Section 8 secure-context statement and NFR-08 check |
+| P-07 | Partly resolved, see R3-02 | Section 8 `draftedAt` comparison and 404 and delete removal. Rejected drafts have no removal trigger when their note is deleted elsewhere |
+| P-08 | Resolved | Section 7 checklist PATCH delete and re-insert in one transaction |
+| P-09 | Resolved | `HOST` removed from Sections 9 and 10; the API binds to `127.0.0.1` |
+
+### New findings
+**R3-01. Overflow rule order rejects the identical retry before it can return 200 (Major).**
+- Evidence: Section 6, "Overflow idempotency (P-02)". Step 1 returns 400 if `id` "already exists on another note". Step 2 returns 200 for an identical retry, where `original.continuedInId` equals `id`. An identical retry reuses the overflow note's `id`, which already exists, so step 1 fires first. Step 2 can never be reached for the case it describes.
+- Impact: the case P-02 exists to fix (a lost 201 response) still fails. The client receives 400 and treats the overflow as rejected, and the user cannot recover from the UI. The original user-visible failure remains.
+- Recommendation: check step 2 before step 1, or state that step 1 applies only when `id` is not the stored `continuedInId`. Make the wording unambiguous about "another note".
+- Disposition: user decision 2026-11-16, option A: move the identical-retry check (step 2) ahead of the duplicate-ID check, so step 1 applies only when `id` belongs to a note other than the stored overflow note. The Architect applies the change to architecture.md, and this agent re-checks it.
+
+**R3-02. Rejected drafts for a note deleted elsewhere have no removal trigger (Minor, residual of P-07).**
+- Evidence: Section 8, "Draft conflicts (P-07)". A draft is removed on a 404 or when "the note is deleted". A rejected draft is never sent, so no 404 occurs. If the note was deleted in another tab, the rejected draft has no trigger to clear it.
+- Impact: the stale-draft problem from P-07 remains for rejected drafts. They stay in `localStorage` until the user acts, and the user may never open that note.
+- Recommendation: on load, check each rejected draft with `GET /api/notes/:id` and remove it on 404. Alternatively, accept the residual risk and say so. This is a user decision.
+- Disposition: user decision 2026-11-16, option A: on load, each rejected draft is checked with `GET /api/notes/:id` and removed on 404. The Architect applies this to architecture.md, and this agent re-checks it.
+
+**R3-03. Failure feedback text is not defined (Minor).**
+- Evidence: Section 8 table, "Toast with the save-failed message". No such message is defined in the Subtle messages list.
+- Impact: the wording cannot be tested or implemented consistently.
+- Recommendation: define the message text once, for example in the Subtle messages list.
+- Disposition: user decision 2026-11-16, option A: define one shared save-failed message in the Subtle messages list (Section 8) and reference it from the feedback column. Wording: "Could not save. Your changes are still shown here; try again." The Architect applies this to architecture.md, and this agent re-checks it.
+
+### Areas re-checked with no new finding
+- Requirement coverage (Section 15) after the P-01 to P-09 updates.
+- Server validation, error format, and the `id` rules apart from R3-01.
+- Secrets and environment variable names after removing `HOST`.
+- XSS, accessibility, browser support, and MVP scope: unchanged from earlier rounds.
+
+### Gate status
+- Exit gate: `docs/design-review.md` exists with categorized findings and dispositions. Met.
+- Blocking: R3-01 is Major and P-02 is open. Planning remains blocked.
+- Not recorded here: the design-review completion decision in `approvals.json`. It belongs to the user.
+
+## 7.13 Round 3 Re-Check of Architecture v0.6 (2026-11-16)
+Scope: `docs/architecture.md` v0.6 checked against the Section 7.12 dispositions (R3-01 to R3-03) and the Section 7.11 decisions (P-01 to P-09). This re-check did not edit the architecture.
+
+| ID | Status | Evidence in v0.6 |
+|---|---|---|
+| R3-01 | Closed (Resolved) | Section 6 "Overflow idempotency (P-02)": step 1 is the identical-retry check (200 when `original.continuedInId` equals `id` and content matches; 400 when content differs). Step 2 applies the duplicate-ID 400 only to a note other than the stored overflow note. |
+| R3-02 | Closed (Resolved) | Section 8 "Draft conflicts (P-07)": on load, each rejected draft is checked with `GET /api/notes/:id` and removed on 404. |
+| R3-03 | Closed (Resolved) | Section 8 "Subtle messages" defines the shared save-failed text, and the feedback column of the non-text action table references it. |
+| P-02 | Closed (Resolved) | Follows from R3-01. The identical retry now reaches its 200 response, so the lost-201 case is recoverable. |
+| P-07 | Closed (Resolved) | Follows from R3-02. Rejected drafts now have a removal trigger when the note no longer exists. |
+| P-01 to P-09 | Closed (Resolved) | Re-checked in Section 7.12; no change in v0.6. |
+| M-01 to M-08, N-01 to N-12 | Closed (Resolved) | Previously closed in Sections 6.2, 7.2 to 7.10. No regression found in v0.6 for the overflow title, overflow contract, schema index and `ORDER BY` (Section 7), or the `id` and `archived` validation rules. |
+
+#### Open items
+- None blocking. No Major or Minor finding remains open in `docs/architecture.md` v0.6.
+- Independence: this re-check was performed in the same working session that applied the architecture changes. The human reviewer should weigh this when approving the design-review phase.
+- Not decided here: the design-review completion in `approvals.json` (`approvedBy` is `"user"`, and the completion approval belongs to the user). Planning proceeds only after the user's explicit approval.

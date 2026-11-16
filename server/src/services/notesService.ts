@@ -1,112 +1,199 @@
-import { NotesRepository, type Note, type NoteInput, type ChecklistItem } from '../db/notesRepository';
+﻿import { NotesRepository, type Note, type NoteInput, type ChecklistItem } from '../db/notesRepository.js';
+import { AppError } from '../errors/AppError.js';
+
+export interface CreateNoteServiceInput {
+  id: string;
+  title?: string;
+  body?: string;
+  color?: string;
+  checklistItems?: ChecklistItem[];
+}
+
+export interface UpdateNoteServiceInput {
+  title?: string;
+  body?: string;
+  color?: string;
+  isPinned?: boolean;
+  isArchived?: boolean;
+  checklistItems?: ChecklistItem[];
+}
+
+export interface CreateNoteResult {
+  status: 201 | 200;
+  note: Note;
+}
+
+export interface OverflowResult {
+  status: 201 | 200;
+  note: Note;
+  original: Note;
+}
 
 /**
  * Business logic for notes: archive/unarchive, overflow, delete with relinking,
- * and updatedAt semantics. All operations are transactional.
+ * repeated POST idempotency, and updatedAt semantics. All operations are transactional.
  */
 export class NotesService {
   constructor(private repo: NotesRepository) {}
 
   /**
-   * Create a new note with the given fields. Sets createdAt and updatedAt to now.
-   * All scalar fields are validated before reaching here (by the route handler).
+   * Create a new note or handle repeated POST idempotency (N-01, N-11).
+   * - If id does not exist: creates note with status 201.
+   * - If id exists and content matches (title, body, normalized color, ordered checklist): returns status 200 and stored note.
+   * - If id exists and content differs: throws 400 VALIDATION_ERROR without modifying stored note.
    */
-  createNote(input: Omit<NoteInput, 'createdAt' | 'updatedAt'>): Note {
+  createNote(input: CreateNoteServiceInput): CreateNoteResult {
+    const stored = this.repo.findById(input.id);
+    if (stored) {
+      const inputTitle = input.title ?? '';
+      const inputBody = input.body ?? '';
+      const inputColor = input.color ?? 'white';
+      const inputItems = input.checklistItems ?? [];
+
+      const titleMatches = stored.title === inputTitle;
+      const bodyMatches = stored.body === inputBody;
+      const colorMatches = stored.color === inputColor;
+
+      const itemsMatch =
+        stored.checklistItems.length === inputItems.length &&
+        stored.checklistItems.every(
+          (item, idx) =>
+            item.text === inputItems[idx].text &&
+            item.isChecked === inputItems[idx].isChecked
+        );
+
+      if (titleMatches && bodyMatches && colorMatches && itemsMatch) {
+        return { status: 200, note: stored };
+      } else {
+        throw AppError.validationError('Note with this ID already exists with different content');
+      }
+    }
+
+    if (input.checklistItems && input.checklistItems.length > 50) {
+      throw AppError.validationError('Checklist cannot exceed 50 items');
+    }
+
     const now = new Date().toISOString();
-    return this.repo.insertNote({
-      ...input,
+    const note = this.repo.insertNote({
+      id: input.id,
+      title: input.title ?? '',
+      body: input.body ?? '',
+      color: input.color ?? 'white',
+      isPinned: false,
+      isArchived: false,
       createdAt: now,
       updatedAt: now,
+      continuedFromId: null,
+      continuedInId: null,
+      checklistItems: input.checklistItems ?? [],
     });
+
+    return { status: 201, note };
   }
 
   /**
-   * Partially update a note's fields. Only fields that actually differ from the stored
-   * value cause updatedAt to advance (FR-13). Archive and pin state are handled with
-   * special rules. Returns the updated note.
+   * Read one note by ID. Throws 404 NOT_FOUND if note does not exist.
    */
-  updateNote(
-    noteId: string,
-    updates: Partial<Omit<NoteInput, 'id' | 'createdAt' | 'checklistItems'>> & {
-      checklistItems?: ChecklistItem[];
+  getNoteById(id: string): Note {
+    const note = this.repo.findById(id);
+    if (!note) {
+      throw AppError.notFound('Note not found');
     }
-  ): Note {
+    return note;
+  }
+
+  /**
+   * List notes in one view (active or archived).
+   */
+  listNotes(isArchived: boolean): Note[] {
+    return this.repo.listByArchived(isArchived);
+  }
+
+  /**
+   * Partially update a note's fields according to Architecture §6 Rules.
+   */
+  updateNote(noteId: string, updates: UpdateNoteServiceInput): Note {
     const stored = this.repo.findById(noteId);
-    if (!stored) throw new Error(`Note not found: ${noteId}`);
+    if (!stored) {
+      throw AppError.notFound('Note not found');
+    }
+
+    if (updates.checklistItems !== undefined && updates.checklistItems.length > 50) {
+      throw AppError.validationError('Checklist cannot exceed 50 items');
+    }
+
+    const titleChanged = updates.title !== undefined && updates.title !== stored.title;
+    const bodyChanged = updates.body !== undefined && updates.body !== stored.body;
+    const colorChanged = updates.color !== undefined && updates.color !== stored.color;
+    const isPinnedChanged = updates.isPinned !== undefined && updates.isPinned !== stored.isPinned;
+
+    let checklistChanged = false;
+    if (updates.checklistItems !== undefined) {
+      if (updates.checklistItems.length !== stored.checklistItems.length) {
+        checklistChanged = true;
+      } else {
+        checklistChanged = updates.checklistItems.some(
+          (item, i) =>
+            item.text !== stored.checklistItems[i].text ||
+            item.isChecked !== stored.checklistItems[i].isChecked
+        );
+      }
+    }
+
+    const otherFieldsChanged =
+      titleChanged || bodyChanged || colorChanged || isPinnedChanged || checklistChanged;
 
     const fieldsToUpdate: Partial<Omit<NoteInput, 'id' | 'checklistItems'>> = {};
     let hasAnyChange = false;
 
-    // Check archive state changes and apply archive rules
-    if (updates.isArchived !== undefined && updates.isArchived !== stored.isArchived) {
-      fieldsToUpdate.isArchived = updates.isArchived;
-      hasAnyChange = true;
+    if (stored.isArchived) {
+      if (updates.isArchived !== false) {
+        throw AppError.noteArchived();
+      }
 
-      // If archiving (isArchived: true), always clear pin state (FR-10, Section 6)
+      if (otherFieldsChanged) {
+        throw AppError.validationError('Cannot combine unarchiving with other field changes');
+      }
+
+      fieldsToUpdate.isArchived = false;
+      fieldsToUpdate.isPinned = false;
+      hasAnyChange = true;
+    } else {
       if (updates.isArchived === true) {
+        fieldsToUpdate.isArchived = true;
         fieldsToUpdate.isPinned = false;
         hasAnyChange = true;
+      } else if (isPinnedChanged) {
+        fieldsToUpdate.isPinned = updates.isPinned!;
+        hasAnyChange = true;
       }
-      // If unarchiving (isArchived: false), always unpin (FR-10, Section 6)
-      else if (updates.isArchived === false) {
-        fieldsToUpdate.isPinned = false;
+
+      if (titleChanged) {
+        fieldsToUpdate.title = updates.title!;
+        hasAnyChange = true;
+      }
+      if (bodyChanged) {
+        fieldsToUpdate.body = updates.body!;
+        hasAnyChange = true;
+      }
+      if (colorChanged) {
+        fieldsToUpdate.color = updates.color!;
+        hasAnyChange = true;
+      }
+      if (checklistChanged) {
         hasAnyChange = true;
       }
     }
 
-    // If isArchived is not being updated but isPinned is, apply archiving logic
-    if (
-      updates.isPinned !== undefined &&
-      updates.isPinned !== stored.isPinned &&
-      !('isArchived' in fieldsToUpdate)
-    ) {
-      fieldsToUpdate.isPinned = updates.isPinned;
-      hasAnyChange = true;
-    }
-
-    // Handle other scalar fields
-    const otherFields: (keyof Omit<
-      Omit<NoteInput, 'id' | 'checklistItems'>,
-      'isArchived' | 'isPinned'
-    >)[] = ['title', 'body', 'color', 'continuedFromId', 'continuedInId'];
-
-    for (const field of otherFields) {
-      const key = field as keyof typeof updates;
-      if (updates[key] !== undefined && updates[key] !== stored[key as keyof Note]) {
-        (fieldsToUpdate as any)[key] = updates[key];
-        hasAnyChange = true;
-      }
-    }
-
-    // Handle checklist items separately
-    if (updates.checklistItems !== undefined) {
-      const storedItems = stored.checklistItems;
-      const incomingItems = updates.checklistItems;
-
-      // Compare checklist items by content and order (N-11: order is significant)
-      const itemsEqual =
-        storedItems.length === incomingItems.length &&
-        storedItems.every(
-          (item, i) =>
-            item.text === incomingItems[i].text && item.isChecked === incomingItems[i].isChecked
-        );
-
-      if (!itemsEqual) {
-        hasAnyChange = true;
-      }
-    }
-
-    // Only advance updatedAt if there was an actual change (FR-13)
     if (hasAnyChange) {
       fieldsToUpdate.updatedAt = new Date().toISOString();
     }
 
-    // Apply all changes in a transaction
     return this.repo.runInTransaction(() => {
       if (Object.keys(fieldsToUpdate).length > 0) {
         this.repo.updateFields(noteId, fieldsToUpdate);
       }
-      if (updates.checklistItems !== undefined) {
+      if (checklistChanged && updates.checklistItems !== undefined) {
         this.repo.replaceChecklistItems(noteId, updates.checklistItems);
       }
       return this.repo.findById(noteId)!;
@@ -115,91 +202,97 @@ export class NotesService {
 
   /**
    * Delete a note and relink its overflow neighbours in one transaction (N-08, Option 1).
-   * If a note is in the middle of a chain (has both continuedFromId and continuedInId),
-   * link the previous note to the next note. If it is the head (only continuedInId),
-   * clear the next note's continuedFromId. If it is the tail (only continuedFromId),
-   * clear the previous note's continuedInId. If standalone, no relinking.
    */
   deleteNote(noteId: string): void {
-    return this.repo.runInTransaction(() => {
-      const note = this.repo.findById(noteId);
-      if (!note) throw new Error(`Note not found: ${noteId}`);
-
-      const prev = note.continuedFromId;
-      const next = note.continuedInId;
-
-      // Middle note: relink previous to next
-      if (prev && next) {
-        this.repo.updateFields(prev, { continuedInId: next });
-        this.repo.updateFields(next, { continuedFromId: prev });
-      }
-      // Head note: clear next's continuedFromId
-      else if (!prev && next) {
-        this.repo.updateFields(next, { continuedFromId: null });
-      }
-      // Tail note: clear prev's continuedInId
-      else if (prev && !next) {
-        this.repo.updateFields(prev, { continuedInId: null });
-      }
-      // Standalone: nothing to do
-
-      // Delete the note (checklist items cascade via foreign key)
-      this.repo.deleteById(noteId);
-    });
+    const deleted = this.repo.deleteWithRelinking(noteId);
+    if (!deleted) {
+      throw AppError.notFound('Note not found');
+    }
   }
 
   /**
-   * Create an overflow note from the 51st checklist item. Requires the note to have
-   * exactly 50 items and not already have continuedInId set. Returns both the new
-   * overflow note and the updated original note.
+   * Create an overflow note from the 51st checklist item (P-02 / R3-01).
+   * Follows R3-01 check order:
+   * 1. If original.continuedInId === overflowId:
+   *    If stored overflow item matches: return 200 with { note, original }.
+   *    If content differs: return 400 VALIDATION_ERROR.
+   * 2. If overflowId exists on another note: return 400 VALIDATION_ERROR.
+   * 3. If original.continuedInId is set to a different ID: return 400 VALIDATION_ERROR.
+   * 4. Otherwise verify original is not archived and has exactly 50 items, create overflow note with status 201.
    */
   createOverflowNote(
-    noteId: string,
+    originalNoteId: string,
+    overflowId: string,
     newItem: ChecklistItem
-  ): { note: Note; original: Note } {
-    const stored = this.repo.findById(noteId);
-    if (!stored) throw new Error(`Note not found: ${noteId}`);
-
-    // Validate preconditions
-    if (stored.checklistItems.length !== 50) {
-      throw new Error(`Overflow requires exactly 50 items, found ${stored.checklistItems.length}`);
-    }
-    if (stored.continuedInId) {
-      throw new Error('Note already has a continuation; cannot overflow again');
-    }
-    if (stored.isArchived) {
-      throw new Error('Cannot overflow an archived note');
+  ): OverflowResult {
+    const original = this.repo.findById(originalNoteId);
+    if (!original) {
+      throw AppError.notFound('Note not found');
     }
 
-    // Create the overflow note with the new item
-    const now = new Date().toISOString();
-    const overflowTitle = stored.title ? `Continued from ${stored.title}` : 'Continued from Untitled';
-    // Truncate overflow title to 200 characters max
-    const truncatedTitle = overflowTitle.length > 200 ? overflowTitle.substring(0, 200) : overflowTitle;
+    // Step 1: Idempotency check for retry of the same continuation
+    if (original.continuedInId === overflowId) {
+      const storedOverflow = this.repo.findById(overflowId);
+      if (
+        storedOverflow &&
+        storedOverflow.checklistItems.length === 1 &&
+        storedOverflow.checklistItems[0].text === newItem.text &&
+        storedOverflow.checklistItems[0].isChecked === newItem.isChecked
+      ) {
+        return { status: 200, note: storedOverflow, original };
+      } else {
+        throw AppError.validationError('Overflow note with this ID already exists with different content');
+      }
+    }
 
-    const overflowNote = this.repo.insertNote({
-      id: crypto.randomUUID(), // Generate new UUID for the overflow note
-      title: truncatedTitle,
-      body: '',
-      color: 'white',
-      isPinned: false,
-      isArchived: false,
-      createdAt: now,
-      updatedAt: now,
-      continuedFromId: noteId,
-      continuedInId: null,
-      checklistItems: [newItem],
+    // Step 2: Id exists on another note
+    const existingWithId = this.repo.findById(overflowId);
+    if (existingWithId) {
+      throw AppError.validationError('Note with this ID already exists');
+    }
+
+    // Step 3: Original already has a different continuation
+    if (original.continuedInId !== null) {
+      throw AppError.validationError('Note already has a continuation; cannot overflow again');
+    }
+
+    // Step 4: Validate preconditions for initial overflow creation
+    if (original.isArchived) {
+      throw AppError.noteArchived();
+    }
+
+    if (original.checklistItems.length < 50) {
+      throw AppError.validationError(
+        `Overflow requires at least 50 items, found ${original.checklistItems.length}`
+      );
+    }
+
+    return this.repo.runInTransaction(() => {
+      const now = new Date().toISOString();
+      const rawTitle = original.title ? `Continued from ${original.title}` : 'Continued from Untitled';
+      const codePoints = [...rawTitle];
+      const overflowTitle = codePoints.length > 200 ? codePoints.slice(0, 200).join('') : rawTitle;
+
+      const overflowNote = this.repo.insertNote({
+        id: overflowId,
+        title: overflowTitle,
+        body: '',
+        color: 'white',
+        isPinned: false,
+        isArchived: false,
+        createdAt: now,
+        updatedAt: now,
+        continuedFromId: originalNoteId,
+        continuedInId: null,
+        checklistItems: [newItem],
+      });
+
+      this.repo.updateFields(originalNoteId, {
+        continuedInId: overflowId,
+      });
+
+      const updatedOriginal = this.repo.findById(originalNoteId)!;
+      return { status: 201, note: overflowNote, original: updatedOriginal };
     });
-
-    // Update the original note to link to the overflow note
-    this.repo.updateFields(noteId, {
-      continuedInId: overflowNote.id,
-      // Do NOT update updatedAt because links are not user-edited content (D-05)
-    });
-
-    // Fetch the updated original
-    const updatedOriginal = this.repo.findById(noteId)!;
-
-    return { note: overflowNote, original: updatedOriginal };
   }
 }

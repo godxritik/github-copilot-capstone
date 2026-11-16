@@ -3,4 +3,6 @@ dist/
 *.sqlite
 *.sqlite-journal
 .env
+.env.local
+.env.*.local
 coverage/
