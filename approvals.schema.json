@@ -1,0 +1,194 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Agentic SDLC Approval Registry",
+  "description": "Validates the structure of the project permission registry; it does not enforce tool access or verify human approvals.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "version", "project", "pipeline", "globalPolicies", "phases"],
+  "properties": {
+    "$schema": {
+      "description": "Relative path to the schema used to validate this registry.",
+      "const": "./approvals.schema.json"
+    },
+    "version": {
+      "description": "Version of the approval registry format.",
+      "const": "1.0"
+    },
+    "project": {
+      "description": "Human-readable project name.",
+      "type": "string",
+      "minLength": 1
+    },
+    "pipeline": {
+      "description": "Pipeline-wide human approval and progression settings.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requireApprovalBetweenPhases", "allowAutoAdvance", "humanInTheLoop"],
+      "properties": {
+        "requireApprovalBetweenPhases": {
+          "description": "Whether explicit human approval is required at every phase transition.",
+          "type": "boolean"
+        },
+        "allowAutoAdvance": {
+          "description": "Whether the pipeline may advance without a separate human transition decision.",
+          "type": "boolean"
+        },
+        "humanInTheLoop": {
+          "description": "Whether a human participates in pipeline approval decisions.",
+          "type": "boolean"
+        }
+      }
+    },
+    "globalPolicies": {
+      "description": "Global action limits applied in addition to phase permissions; a denial takes precedence.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowFileDeletion", "allowGitPush", "allowGitCommit", "allowRunCommands", "allowInstallDependencies", "allowNetworkAccess", "blockSecretsInOutput"],
+      "properties": {
+        "allowFileDeletion": {
+          "description": "Permission to delete files, including deletion performed indirectly by commands.",
+          "$ref": "#/definitions/permission"
+        },
+        "allowGitPush": {
+          "description": "Permission to push local commits or branches to a remote repository.",
+          "$ref": "#/definitions/permission"
+        },
+        "allowGitCommit": {
+          "description": "Permission to create local Git commits.",
+          "$ref": "#/definitions/permission"
+        },
+        "allowRunCommands": {
+          "description": "Global permission for executing commands, additionally restricted by phase permissions.",
+          "$ref": "#/definitions/permission"
+        },
+        "allowInstallDependencies": {
+          "description": "Global permission to install or change dependencies; network and file-write limits also apply.",
+          "$ref": "#/definitions/permission"
+        },
+        "allowNetworkAccess": {
+          "description": "Permission for network requests, including package downloads and GitHub API calls.",
+          "$ref": "#/definitions/permission"
+        },
+        "blockSecretsInOutput": {
+          "description": "When true, secrets must not be exposed in responses, reports, logs, or command output.",
+          "type": "boolean"
+        }
+      }
+    },
+    "phases": {
+      "description": "The eight ordered specialist phases and their permission records.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requirements", "architecture", "design-review", "planning", "implementation", "code-review", "verify", "pr"],
+      "properties": {
+        "requirements": {
+          "description": "Requirements elicitation and documentation permissions.",
+          "$ref": "#/definitions/phase"
+        },
+        "architecture": {
+          "description": "System architecture documentation permissions.",
+          "$ref": "#/definitions/phase"
+        },
+        "design-review": {
+          "description": "Independent architecture review permissions.",
+          "$ref": "#/definitions/phase"
+        },
+        "planning": {
+          "description": "Implementation planning permissions.",
+          "$ref": "#/definitions/phase"
+        },
+        "implementation": {
+          "description": "Task-scoped implementation permissions.",
+          "$ref": "#/definitions/phase"
+        },
+        "code-review": {
+          "description": "Peer code review and report permissions.",
+          "$ref": "#/definitions/phase"
+        },
+        "verify": {
+          "description": "Test authoring, execution, and verification reporting permissions.",
+          "$ref": "#/definitions/phase"
+        },
+        "pr": {
+          "description": "Release documentation and pull request creation permissions.",
+          "$ref": "#/definitions/phase"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "permission": {
+      "description": "true or approved permits an action within all other limits; false or locked denies it; ask requires explicit approval before execution.",
+      "enum": [true, false, "ask", "locked", "approved"]
+    },
+    "phaseName": {
+      "description": "An existing phase identifier in pipeline order.",
+      "enum": ["requirements", "architecture", "design-review", "planning", "implementation", "code-review", "verify", "pr"]
+    },
+    "phase": {
+      "description": "A specialist permission record; approval to start is distinct from approval to complete.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent", "status", "canWriteFiles", "requiresApprovalToComplete"],
+      "properties": {
+        "agent": {
+          "description": "Dedicated specialist agent responsible for this phase.",
+          "enum": ["requirements-agent", "architecture-agent", "design-review-agent", "planning-agent", "implementation-agent", "code-review-agent", "verify-agent", "pr-agent"]
+        },
+        "status": {
+          "description": "Phase entry state: locked prevents work; approved authorizes eligible work but does not indicate completion.",
+          "enum": ["locked", "approved"]
+        },
+        "canWriteFiles": {
+          "description": "Allowlisted repository-relative paths or globs; ** matches descendants. Unlisted write targets are denied.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "description": "A forward-slash relative path or glob without absolute roots, backslashes, or parent-directory traversal.",
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!/)(?!.*\\\\)(?!.*:)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+          }
+        },
+        "canRunCommands": {
+          "description": "Phase permission to run commands, subject to global command and action restrictions.",
+          "$ref": "#/definitions/permission"
+        },
+        "canInstallDependencies": {
+          "description": "Phase permission for dependency installation; absence grants no installation permission.",
+          "$ref": "#/definitions/permission"
+        },
+        "canCreatePR": {
+          "description": "Phase permission to create a PR; global network and Git policies remain applicable.",
+          "$ref": "#/definitions/permission"
+        },
+        "canMergePR": {
+          "description": "Phase permission to merge a PR; agent boundaries may impose a stricter prohibition.",
+          "$ref": "#/definitions/permission"
+        },
+        "requiresApprovalPerTask": {
+          "description": "Whether explicit human approval is required before each individual implementation task.",
+          "type": "boolean"
+        },
+        "requiresApprovalToComplete": {
+          "description": "Whether a human must explicitly approve completion after the exit gate is checked.",
+          "type": "boolean"
+        },
+        "approvedBy": {
+          "description": "Identity of the human who confirmed phase completion; null means completion approval is not recorded. Must not contain credentials.",
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "dependsOn": {
+          "description": "Predecessor phase whose exit gate and human completion approval must be satisfied first.",
+          "$ref": "#/definitions/phaseName"
+        },
+        "exitGate": {
+          "description": "Required completion evidence, supplemented by the orchestrator and specialist quality gates.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

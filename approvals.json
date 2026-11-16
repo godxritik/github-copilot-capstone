@@ -1,0 +1,104 @@
+{
+  "$schema": "./approvals.schema.json",
+  "version": "1.0",
+  "project": "Google Keep Notes (Web)",
+  "pipeline": {
+    "requireApprovalBetweenPhases": true,
+    "allowAutoAdvance": false,
+    "humanInTheLoop": true
+  },
+  "globalPolicies": {
+    "allowFileDeletion": false,
+    "allowGitPush": false,
+    "allowGitCommit": true,
+    "allowRunCommands": true,
+    "allowInstallDependencies": "ask",
+    "allowNetworkAccess": true,
+    "blockSecretsInOutput": true
+  },
+  "phases": {
+    "requirements": {
+      "agent": "requirements-agent",
+      "status": "approved",
+      "canWriteFiles": ["docs/requirements.md"],
+      "canRunCommands": true,
+      "requiresApprovalToComplete": true,
+      "approvedBy": "user",
+      "exitGate": "requirements.md exists with FRs and NFRs"
+    },
+    "architecture": {
+      "agent": "architecture-agent",
+      "status": "approved",
+      "canWriteFiles": ["docs/architecture.md"],
+      "canRunCommands": true,
+      "requiresApprovalToComplete": true,
+      "approvedBy": "user",
+      "dependsOn": "requirements",
+      "exitGate": "architecture.md exists with diagrams and tech stack"
+    },
+    "design-review": {
+      "agent": "design-review-agent",
+      "status": "approved",
+      "canWriteFiles": ["docs/design-review.md", "docs/architecture.md"],
+      "canRunCommands": true,
+      "requiresApprovalToComplete": true,
+      "approvedBy": "user",
+      "dependsOn": "architecture",
+      "exitGate": "design-review.md exists with findings categorized"
+    },
+    "planning": {
+      "agent": "planning-agent",
+      "status": "approved",
+      "canWriteFiles": ["docs/impl-plan.md"],
+      "canRunCommands": false,
+      "requiresApprovalToComplete": true,
+      "approvedBy": "user",
+      "dependsOn": "design-review",
+      "exitGate": "impl-plan.md exists with dependency-ordered tasks"
+    },
+    "implementation": {
+      "agent": "implementation-agent",
+      "status": "approved",
+      "canWriteFiles": ["client/**", "server/**"],
+      "canRunCommands": true,
+      "canInstallDependencies": true,
+      "requiresApprovalPerTask": true,
+      "requiresApprovalToComplete": true,
+      "approvedBy": "user",
+      "dependsOn": "planning",
+      "exitGate": "code compiles and unit tests exist"
+    },
+    "code-review": {
+      "agent": "code-review-agent",
+      "status": "locked",
+      "canWriteFiles": ["docs/code-review-report.md"],
+      "canRunCommands": false,
+      "requiresApprovalToComplete": true,
+      "approvedBy": null,
+      "dependsOn": "implementation",
+      "exitGate": "all checklist areas evaluated, findings documented"
+    },
+    "verify": {
+      "agent": "verify-agent",
+      "status": "locked",
+      "canWriteFiles": ["client/tests/**", "server/tests/**", "docs/verification-report.md"],
+      "canRunCommands": "ask",
+      "requiresApprovalToComplete": true,
+      "approvedBy": null,
+      "dependsOn": "code-review",
+      "exitGate": "all tests pass and verification report produced"
+    },
+    "pr": {
+      "agent": "pr-agent",
+      "status": "locked",
+      "canWriteFiles": ["CHANGELOG.md", ".github/pull_request_template.md"],
+      "canRunCommands": "ask",
+      "canCreatePR": "ask",
+      "canMergePR": false,
+      "requiresApprovalToComplete": true,
+      "approvedBy": null,
+      "dependsOn": "verify",
+      "exitGate": "PR created with all required sections"
+    }
+  }
+}
