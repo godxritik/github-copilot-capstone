@@ -347,3 +347,87 @@ None identified. All N-01 to N-11 are now closed or resolved in v0.4.
 
 ### 7.10 Design Review Complete
 Architecture v0.4 passes re-check. All findings N-01 to N-12 are resolved. The design review is complete and ready for human approval to complete the phase.
+
+## 7.11 Round 3 Review of Architecture v0.4 (2026-11-16)
+Scope: `docs/architecture.md` v0.4 against `docs/requirements.md` v0.8. Findings already recorded in Sections 7.1 to 7.10 are not repeated. Findings are new unless marked as a residual.
+
+### Summary
+No Critical finding. One Major finding (P-02) describes a recoverable-data failure on a valid user flow and should be resolved by the Architect before planning starts. Eight Minor findings (P-01 and P-03 to P-09) are recorded for the Architect to address or accept.
+
+### Findings
+
+**P-01. Trigger and failure feedback for non-text actions are not specified (Minor).**
+- Evidence: Section 8 (autosave, line 206) covers failed saves generically, with a per-note draft and retries. Section 6 PATCH accepts `isPinned`, `isArchived`, `color`, and `checklistItems`. Neither section says whether checkbox toggles, pin, color, or archive send immediately or on blur, or whether the UI rolls back a failed toggle. FR-11 requires checks to persist after reload.
+- Impact: a failed checkbox toggle or pin change may look saved and then disappear on reload. The draft mechanism stores text, so it is unclear whether a failed non-text change is kept at all.
+- Recommendation: in Section 8, state for each non-text action whether it is sent immediately, whether the UI rolls back on failure, and whether a Toast is shown. State whether drafts apply only to text.
+
+**P-02. Overflow creation is not idempotent and has no failure path (Major).**
+- Evidence: `POST /api/notes/:id/overflow` (Section 6) has the server generate the new note ID. N-01 made only `POST /api/notes` idempotent. Under the overflow rules, once `continuedInId` is set, a repeated overflow request returns 400 `VALIDATION_ERROR`. Section 8 defines no retry for overflow.
+- Impact: if the response is lost after the server created the overflow note, the client shows an error and the user sees a failure for a note that exists. A second attempt is then rejected by the chain rule, so the user cannot recover from the UI.
+- Recommendation: have the client supply the new note's UUID (as N-01 does for create), return the stored pair with 200 or 201 for an identical retry, and return 400 only for different content. Alternatively, the client can refetch the list after an overflow failure. Document the rule in Section 6 and the flow in Section 8.
+- Proposed resolution (for the Architect to apply to `docs/architecture.md`; this agent does not edit it; not agreed):
+  - Section 6, `POST /api/notes/:id/overflow`: the request body adds `id` (client UUID, required, same format rule as `POST /api/notes`). The server stores the new note with that ID.
+  - Rule (P-02): if `original.continuedInId` equals the supplied `id`, and the stored overflow note matches the request (`text` and `isChecked` at position 0, with the N-11 normalization), return 200 with the stored `{ "note", "original" }`. If `original.continuedInId` is set to a different ID, return 400 `VALIDATION_ERROR`. If `id` already exists on another note, return 400 `VALIDATION_ERROR`.
+  - Section 8: the client keeps the overflow request as a pending draft keyed by the original note ID and the new UUID, retries it on the same triggers as text drafts, and clears it on 200 or 201. The retry uses the latest state of the original note, as in the autosave rules.
+  - Section 6 validation table: add `id` as a required field for the overflow endpoint, and add the 200 identical-retry response to the status column.
+- Status: proposed only. The user must agree before the Architect applies it. Expected effect: P-02 is closed once the Architect applies this text and the Design Review Agent re-checks it.
+
+**P-03. Archive and overflow chains can split across views (Minor).**
+- Evidence: Section 6 covers overflow and delete relinking but not archiving a note that belongs to a chain. Archiving the original, or a middle note, leaves its neighbours active. Section 9 has no rule for this case.
+- Impact: a chain can be partly active and partly archived. Navigation through "Continue in new note" then crosses views, which is not defined.
+- Recommendation: state that archive is per note and that chain links are kept across views, or define a rule that keeps the chain in one view. Record the choice as a decision for the user.
+
+**P-04. The performance conditions cited in Section 11 are not in the requirements (Minor).**
+- Evidence: Section 11 says targets are measured "under the conditions in the requirements (standard laptop, 20 Mbps, 50 ms latency)". `docs/requirements.md` v0.8 defines no such conditions.
+- Impact: the cited basis for the NFR-01 measurement does not exist, so the test condition cannot be traced.
+- Recommendation: either add the test conditions to the requirements through the BA and user, or remove the claim and state the actual test environment in Section 11.
+
+**P-05. Performance tests do not cover the stated targets end to end (Minor).**
+- Evidence: Section 11 measures NFR-02 with a unit test of the client filter function. NFR-02 covers the time from input change to updated results. NFR-01 names a "client load check" without a tool or measurement.
+- Impact: a filter function test can pass while the rendered list stays slow. NFR-01 cannot be verified as written.
+- Recommendation: measure NFR-02 from input event to rendered results, for example in a Playwright check with 500 seeded notes. Name the tool and measurement for NFR-01.
+
+**P-06. The client depends on a secure context for `crypto.randomUUID()` (Minor).**
+- Evidence: Section 8 generates note IDs with `crypto.randomUUID()`. Browsers expose this API only in secure contexts. `http://localhost` qualifies, but a client served from another origin does not.
+- Impact: with the local-only design (N-05), this works. If the client origin changes, note creation fails at runtime.
+- Recommendation: state the requirement that the client runs on `localhost` or HTTPS, or add a fallback UUID generator. Include the check in the browser support test for NFR-08.
+
+**P-07. Stale and orphaned drafts can override or hide data (Minor).**
+- Evidence: A-07 applies a stored, non-rejected draft over the server copy on load. A rejected draft has no visible path to Discard or Copy after its note is deleted, because the note is not opened again.
+- Impact: an old draft can overwrite newer server content without warning. Rejected drafts for deleted notes stay in `localStorage` indefinitely.
+- Recommendation: show a confirmation or a comparison when a stored draft is older than the server copy. Remove a draft when its note is deleted or returns 404.
+
+**P-08. Checklist replacement conflicts with the position constraint if applied naively (Minor).**
+- Evidence: `checklist_items` has `UNIQUE (note_id, position)` (Section 7). Section 6 says PATCH replaces the whole checklist list (`checklistItems`, "full replacement list"). Section 7 does not say how the replacement is written.
+- Impact (inferred, not confirmed in the design): if positions are updated one row at a time, the unique constraint can be violated mid-update, which would produce a 500 on a valid request.
+- Recommendation: state that a checklist replacement deletes and re-inserts the note's items in one transaction, or use a deferred uniqueness check.
+
+**P-09. Residual: the `HOST` override still allows network exposure (Minor, residual of M-07 and N-05).**
+- Evidence: Section 9 says the optional `HOST` setting overrides the `127.0.0.1` default. The API has no authentication.
+- Impact: setting `HOST` to a non-loopback address exposes all notes to the network, with no check in the design.
+- Recommendation: remove `HOST` from the MVP, or state in Section 9 that a non-loopback value is unsupported and must not be used.
+
+### Proposed resolutions for Minor findings (P-01, P-03 to P-09)
+These are proposals for the Architect, or for the user where a decision is needed. None is agreed, and this agent does not edit `docs/architecture.md`.
+
+- **P-01 (non-text actions):** add a Section 8 table with one row per action (checklist add, edit, remove, check, pin, color, archive). Columns: send timing (immediate or on blur), failure behavior (UI rolls back to the last saved state), and feedback (Toast with the existing message). State that drafts apply only to text fields. Decision for the user: confirm that non-text actions are not drafted.
+- **P-03 (archive and chains):** add a Section 6 rule: archive is per note, and `continuedFromId` and `continuedInId` stay unchanged on archive and unarchive. The chain may span active and archived views, and the "Continue in new note" link opens an archived note read-only (D-04). Decision for the user: confirm this rule, or require the whole chain to move together.
+- **P-04 (test conditions):** either the BA adds the test conditions (standard laptop, 20 Mbps, 50 ms latency) to `docs/requirements.md` and the user approves the change, or Section 11 states the actual test environment and drops the reference to the requirements. Decision for the user.
+- **P-05 (performance tests):** NFR-02: measure in a browser test from input event to rendered result, with 500 seeded notes, against 300 ms. NFR-01: state that the measured interval is the API response time plus client render, and name the tool (for example, Playwright). Keep the unit test as a supporting check only.
+- **P-06 (secure context):** add to Section 8 that the client runs on `http://localhost` or HTTPS. Add a check to the NFR-08 browser test that note creation works on the supported origin. No fallback generator is needed while the client is local-only.
+- **P-07 (stale and orphaned drafts):** when a stored non-rejected draft is older than the server copy (`updatedAt`), show a confirmation before it is applied. Remove drafts for a note when its 404 is received or the note is deleted. Decision for the user: confirm that these two rules replace last-write-wins on load, or keep A-07 and accept the risk.
+- **P-08 (checklist replacement):** state in Section 7 that a checklist PATCH deletes and re-inserts the note's items in one transaction, so the `UNIQUE (note_id, position)` constraint is not hit mid-update.
+- **P-09 (`HOST`):** remove `HOST` from the MVP environment variables (Section 9 and the variables list in Section 10), so the API always binds to `127.0.0.1`. Decision for the user: confirm removal, or document that a non-loopback value is unsupported.
+
+Once the Architect applies the agreed items, the Design Review Agent re-checks them and closes P-01 and P-03 to P-09.
+
+### Areas reviewed with no new finding
+- Requirement coverage: FR-01 to FR-13, FR-22, and NFR-01 to NFR-12 are mapped in Section 15. Out-of-scope items (FR-14 to FR-21) are not reintroduced.
+- XSS and input safety: plain-text rendering, prepared statements, and the CSP header address NFR-03.
+- API error behavior: the 400, 404, and 500 format matches NFR-12, apart from P-02.
+- Accessibility: focus trap, `aria-live` toasts, and accessible names address NFR-06 and NFR-07.
+- MVP scope: no new Future feature appears in the design.
+
+### Decisions status
+- No new decision has been agreed. P-01 to P-09 are pending the Architect and user.
+- Completion approval for the design-review phase is still the user's decision in `approvals.json`, and it is not recorded here.
