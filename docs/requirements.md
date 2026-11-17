@@ -1,14 +1,14 @@
-# Requirements — Google Keep Notes (Web)
+# Requirements — Keep Notes (Web)
 
 ## 1. Document Info
-- **Project name:** Google Keep Notes (Web)
+- **Project name:** Keep Notes (Web)
 - **Version:** 0.8
 - **Date:** 2026-11-13
 - **Author:** Not specified
 - **Status:** Draft
 
 ## 2. Overview
-Google Keep Notes (Web) is a single-user web application for quickly creating, editing, organizing, searching, and managing personal notes. The MVP provides notes with titles, text bodies, checklists, preset colors, pinning, archiving, and persistent storage through a REST API backed by SQLite.
+Keep Notes (Web) is a single-user web application for quickly creating, editing, organizing, searching, and managing personal notes. The MVP provides notes with titles, text bodies, checklists, preset colors, pinning, archiving, and persistent storage through a REST API backed by SQLite.
 
 ## 3. User Story
 **Source user story:** “As a user, I want a web-based notes application similar to Google Keep, so that I can quickly create, organize, search, and manage my personal notes.”

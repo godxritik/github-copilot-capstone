@@ -1,7 +1,7 @@
-﻿# Architecture: Google Keep Notes (Web)
+﻿# Architecture: Keep Notes (Web)
 
 ## 1. Document Info
-- **Project:** Google Keep Notes (Web)
+- **Project:** Keep Notes (Web)
 - **Version:** 0.7 (applies the design review Section 7.6 resolutions N-01 to N-10, the Section 7.8 clarification N-11, the Section 7.11 Round 3 decisions P-01 to P-09, the Section 7.12 decisions R3-01 to R3-03, and the NFR-08 traceability correction recorded in this version)
 - **Date:** 2026-11-16
 - **Based on:** `docs/requirements.md` v0.8

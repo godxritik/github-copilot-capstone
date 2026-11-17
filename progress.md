@@ -1,4 +1,4 @@
-﻿# Project Progress: Google Keep Notes (Web)
+﻿# Project Progress: Keep Notes (Web)
 
 **Last Updated:** 2026-11-16  
 **Current Phase:** Phase 5 — Implementation  

@@ -7,11 +7,11 @@
         "start": "node dist/src/server.js",
         "dev": "tsx watch src/server.ts"
     },
-    "description": "REST API backend for Google Keep Notes (Web)",
+    "description": "REST API backend for Keep Notes (Web)",
     "type": "module",
     "version": "1.0.0",
     "author": "",
-    "name": "google-keep-notes-api",
+    "name": "keep-notes-api",
     "main": "dist/src/server.js",
     "dependencies": {
         "better-sqlite3": "^13.1.1",

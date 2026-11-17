@@ -1,6 +1,6 @@
 ﻿# Changelog
 
-All notable changes to the Google Keep Notes (Web) project will be documented in this file.
+All notable changes to the Keep Notes (Web) project will be documented in this file.
 
 ## [1.0.0-mvp] - 2026-11-17
 
