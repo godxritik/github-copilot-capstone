@@ -2,16 +2,18 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { SdlcAgentHooks } from '../../src/hooks/sdlcAgentHooks.js';
+import { SdlcAgentHooks } from './sdlcAgentHooks.js';
+import { SdlcCopilotWorkflow } from './workflow.js';
 
-describe('SdlcAgentHooks (Part 1 - Approach B & Part 2 - Approach B)', () => {
+describe('SdlcAgentHooks & Workflow (Part 1 - Approach B & Part 2 - Approach B)', () => {
   let tempDir: string;
   let hooks: SdlcAgentHooks;
+  let workflow: SdlcCopilotWorkflow;
 
   beforeEach(() => {
-    // Resolve realpath to ensure consistent drive letter / casing on Windows
     tempDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-hooks-test-')));
     hooks = new SdlcAgentHooks(tempDir);
+    workflow = new SdlcCopilotWorkflow(tempDir);
 
     // Setup mock approvals.json
     fs.writeFileSync(
@@ -50,7 +52,7 @@ describe('SdlcAgentHooks (Part 1 - Approach B & Part 2 - Approach B)', () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  describe('Part 1 - Approach B: Context Injection (onPreTurn)', () => {
+  describe('Part 1 - Approach B: Context Injection (onPreTurn / prepareTurn)', () => {
     it('injects approvals, progress, and instructions into system context', async () => {
       const result = await hooks.onPreTurn({
         workspaceRoot: tempDir,
@@ -63,6 +65,17 @@ describe('SdlcAgentHooks (Part 1 - Approach B & Part 2 - Approach B)', () => {
       expect(result.systemInstructions).toContain('Allowed Write Files: ["client/**","server/**","progress.md"]');
       expect(result.systemInstructions).toContain('Task 1: Complete');
       expect(result.systemInstructions).toContain('Read registry first.');
+    });
+
+    it('workflow.prepareTurn provides systemInstructions wrapper', async () => {
+      const prepared = await workflow.prepareTurn({
+        workspaceRoot: tempDir,
+        currentPhase: 'implementation',
+        agentName: 'implementation-agent',
+      });
+
+      expect(prepared.systemInstructions).toContain('<sdlc_runtime_context>');
+      expect(prepared.context.currentPhase).toBe('implementation');
     });
 
     it('gracefully handles missing files without throwing', async () => {
@@ -80,7 +93,7 @@ describe('SdlcAgentHooks (Part 1 - Approach B & Part 2 - Approach B)', () => {
     });
   });
 
-  describe('Part 2 - Approach B: Automated Progress Synchronization (onPostToolUse)', () => {
+  describe('Part 2 - Approach B: Automated Progress Synchronization (onPostToolUse / executeToolWithHook)', () => {
     it('automatically appends file modification to progress.md', async () => {
       const changedFile = path.join(tempDir, 'client', 'src', 'App.tsx');
       const appended = await hooks.onPostToolUse(
@@ -100,6 +113,32 @@ describe('SdlcAgentHooks (Part 1 - Approach B & Part 2 - Approach B)', () => {
       const progressContent = fs.readFileSync(path.join(tempDir, 'progress.md'), 'utf8');
       expect(progressContent).toContain('## Automated Activity Log');
       expect(progressContent).toContain('[implementation-agent]**: Modified `client/src/App.tsx`');
+    });
+
+    it('workflow.executeToolWithHook executes tool and logs modification automatically', async () => {
+      const targetFile = path.join(tempDir, 'server', 'src', 'server.ts');
+      let toolExecuted = false;
+
+      const result = await workflow.executeToolWithHook(
+        'edit',
+        { path: targetFile },
+        {
+          workspaceRoot: tempDir,
+          currentPhase: 'implementation',
+          agentName: 'implementation-agent',
+        },
+        async () => {
+          toolExecuted = true;
+          return { status: 'success' };
+        }
+      );
+
+      expect(toolExecuted).toBe(true);
+      expect(result).toEqual({ status: 'success' });
+
+      const progressContent = fs.readFileSync(path.join(tempDir, 'progress.md'), 'utf8');
+      expect(progressContent).toContain('## Automated Activity Log');
+      expect(progressContent).toContain('[implementation-agent]**: Modified `server/src/server.ts`');
     });
 
     it('ignores edits directly made to progress.md to prevent recursion', async () => {
