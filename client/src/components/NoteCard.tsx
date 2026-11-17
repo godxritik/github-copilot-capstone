@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Note, ChecklistItem } from '../api/notesApi.js';
 import { notesApi } from '../api/notesApi.js';
 import { PALETTE, PALETTE_COLORS, type PaletteColor } from '../lib/palette.js';
 import { formatLocalTime } from '../lib/time.js';
 import { useAutoSave } from '../hooks/useAutoSave.js';
+import { useDrafts } from '../hooks/useDrafts.js';
 import { ChecklistEditor } from './ChecklistEditor.js';
 import { ConfirmDialog } from './ConfirmDialog.js';
 import { TOAST_MESSAGES } from './Toast.js';
@@ -23,10 +24,34 @@ export function NoteCard({
   onOpenNote,
   showToast,
 }: NoteCardProps) {
-  const [title, setTitle] = useState(note.title);
-  const [body, setBody] = useState(note.body);
+  const { getDraft } = useDrafts();
+  // Restores an unsaved, non-rejected local draft so the edits stay visible until reconciliation completes
+  const [restoredDraft] = useState(() => {
+    const draft = getDraft(note.id);
+    return draft && !draft.rejected ? draft : null;
+  });
+  const initialTitle = restoredDraft?.title ?? note.title;
+  const initialBody = restoredDraft?.body ?? note.body;
+
+  const [title, setTitle] = useState(initialTitle);
+  const [body, setBody] = useState(initialBody);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
+
+  // Local edits not yet confirmed by the server; while set, server refreshes do not overwrite the text
+  const dirtyRef = useRef(restoredDraft !== null);
+  const latestTextRef = useRef({ title: initialTitle, body: initialBody });
+
+  useEffect(() => {
+    if (dirtyRef.current) {
+      const latest = latestTextRef.current;
+      if (note.title !== latest.title || note.body !== latest.body) return;
+      dirtyRef.current = false;
+    }
+    latestTextRef.current = { title: note.title, body: note.body };
+    setTitle(note.title);
+    setBody(note.body);
+  }, [note.updatedAt, note.title, note.body]);
 
   const isArchived = note.isArchived;
   const palette = PALETTE[note.color as PaletteColor] || PALETTE.white;
@@ -35,6 +60,10 @@ export function NoteCard({
     noteId: note.id,
     onSaveSuccess: (saved) => {
       onUpdate(saved);
+      const latest = latestTextRef.current;
+      if (saved.title === latest.title && saved.body === latest.body) {
+        dirtyRef.current = false;
+      }
     },
     onNoteNotFound: () => {
       showToast(TOAST_MESSAGES.NOTE_REMOVED);
@@ -50,12 +79,16 @@ export function NoteCard({
 
   const handleTitleChange = (newTitle: string) => {
     if (isArchived) return;
+    dirtyRef.current = true;
+    latestTextRef.current = { title: newTitle, body };
     setTitle(newTitle);
     scheduleAutoSave({ title: newTitle, body });
   };
 
   const handleBodyChange = (newBody: string) => {
     if (isArchived) return;
+    dirtyRef.current = true;
+    latestTextRef.current = { title, body: newBody };
     setBody(newBody);
     scheduleAutoSave({ title, body: newBody });
   };

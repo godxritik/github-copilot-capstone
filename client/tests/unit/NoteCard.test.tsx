@@ -83,6 +83,47 @@ describe('NoteCard Component (F-11, F-13, FR-02, FR-04, FR-05, FR-06, FR-07, FR-
     });
   });
 
+  it('restores an unsaved local draft over the server text on mount (FR-12, P-07)', () => {
+    localStorage.setItem(
+      'keep_draft_note-1',
+      JSON.stringify({
+        noteId: 'note-1',
+        title: 'Draft title',
+        body: 'Draft body',
+        draftedAt: '2026-11-16T11:00:00.000Z',
+        rejected: false,
+      })
+    );
+
+    render(
+      <NoteCard note={baseNote} onUpdate={vi.fn()} onDelete={vi.fn()} showToast={vi.fn()} />
+    );
+
+    expect((screen.getByLabelText('Note title') as HTMLInputElement).value).toBe('Draft title');
+    expect((screen.getByLabelText('Note body') as HTMLTextAreaElement).value).toBe('Draft body');
+    localStorage.clear();
+  });
+
+  it('shows server text, not a rejected draft, on mount (A-13)', () => {
+    localStorage.setItem(
+      'keep_draft_note-1',
+      JSON.stringify({
+        noteId: 'note-1',
+        title: 'Rejected title',
+        body: 'Rejected body',
+        draftedAt: '2026-11-16T11:00:00.000Z',
+        rejected: true,
+      })
+    );
+
+    render(
+      <NoteCard note={baseNote} onUpdate={vi.fn()} onDelete={vi.fn()} showToast={vi.fn()} />
+    );
+
+    expect((screen.getByLabelText('Note title') as HTMLInputElement).value).toBe('Test Note Title');
+    localStorage.clear();
+  });
+
   it('renders back-link when continuedFromId is set (F-13)', () => {
     const overflowNote: Note = { ...baseNote, continuedFromId: 'orig-id' };
     const onOpenNote = vi.fn();

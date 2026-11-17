@@ -171,33 +171,6 @@ describe('NotesRepository', () => {
     expect(repo.findById('note-1')!.checklistItems).toEqual([]);
   });
 
-  it('appendChecklistItem adds an item at the next position', () => {
-    repo.insertNote(
-      makeNoteInput({ checklistItems: [{ text: 'first', isChecked: false }] })
-    );
-    repo.appendChecklistItem('note-1', { text: 'second', isChecked: false });
-    const note = repo.findById('note-1')!;
-    expect(note.checklistItems.map((i) => i.text)).toEqual(['first', 'second']);
-  });
-
-  it('countChecklistItems returns the correct count', () => {
-    repo.insertNote(
-      makeNoteInput({
-        checklistItems: [
-          { text: '1', isChecked: false },
-          { text: '2', isChecked: false },
-          { text: '3', isChecked: false },
-        ],
-      })
-    );
-    expect(repo.countChecklistItems('note-1')).toBe(3);
-  });
-
-  it('countChecklistItems returns 0 for a note with no items', () => {
-    repo.insertNote(makeNoteInput());
-    expect(repo.countChecklistItems('note-1')).toBe(0);
-  });
-
   it('deleteById removes the note', () => {
     repo.insertNote(makeNoteInput());
     repo.deleteById('note-1');
@@ -209,7 +182,10 @@ describe('NotesRepository', () => {
       makeNoteInput({ checklistItems: [{ text: 'x', isChecked: false }] })
     );
     repo.deleteById('note-1');
-    expect(repo.countChecklistItems('note-1')).toBe(0);
+    const row = db
+      .prepare('SELECT COUNT(*) as count FROM checklist_items WHERE note_id = ?')
+      .get('note-1') as { count: number };
+    expect(row.count).toBe(0);
   });
 
   it('runInTransaction commits all changes together', () => {

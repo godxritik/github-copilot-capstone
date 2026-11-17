@@ -34,6 +34,7 @@ describe('App Layout and View Navigation (F-16, F-17, FR-01, FR-03, FR-06, NFR-0
 
   beforeEach(() => {
     vi.restoreAllMocks();
+    localStorage.clear();
     vi.spyOn(notesApi, 'listNotes').mockImplementation((archived: boolean) =>
       Promise.resolve(archived ? [mockArchivedNote] : [mockActiveNote])
     );
@@ -122,5 +123,87 @@ describe('App Layout and View Navigation (F-16, F-17, FR-01, FR-03, FR-06, NFR-0
     await waitFor(() => {
       expect(screen.getByDisplayValue('Active Note Item')).toBeDefined();
     });
+  });
+
+  it('auto-applies a local draft that is newer than the server copy on load (P-07)', async () => {
+    localStorage.setItem(
+      'keep_draft_' + mockActiveNote.id,
+      JSON.stringify({
+        noteId: mockActiveNote.id,
+        title: 'Draft Title',
+        body: 'Draft Body',
+        draftedAt: '2026-11-16T11:00:00.000Z',
+        rejected: false,
+      })
+    );
+    const updateSpy = vi.spyOn(notesApi, 'updateNote').mockResolvedValue({
+      ...mockActiveNote,
+      title: 'Draft Title',
+      body: 'Draft Body',
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(updateSpy).toHaveBeenCalledWith(
+        mockActiveNote.id,
+        expect.objectContaining({ title: 'Draft Title', body: 'Draft Body' })
+      );
+    });
+    await waitFor(() => {
+      expect(localStorage.getItem('keep_draft_' + mockActiveNote.id)).toBeNull();
+    });
+  });
+
+  it('asks before overwriting a newer server copy and applies the draft on confirm (P-07)', async () => {
+    localStorage.setItem(
+      'keep_draft_' + mockActiveNote.id,
+      JSON.stringify({
+        noteId: mockActiveNote.id,
+        title: 'Local Edit',
+        body: 'Active Body',
+        draftedAt: '2026-11-16T09:30:00.000Z',
+        rejected: false,
+      })
+    );
+    const updateSpy = vi.spyOn(notesApi, 'updateNote').mockResolvedValue({
+      ...mockActiveNote,
+      title: 'Local Edit',
+    });
+
+    render(<App />);
+
+    const applyButton = await screen.findByRole('button', { name: 'Apply Draft' });
+    expect(screen.getByText('Server version is newer')).toBeDefined();
+    expect(updateSpy).not.toHaveBeenCalled();
+
+    fireEvent.click(applyButton);
+
+    await waitFor(() => {
+      expect(updateSpy).toHaveBeenCalledWith(
+        mockActiveNote.id,
+        expect.objectContaining({ title: 'Local Edit' })
+      );
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'Apply Draft' })).toBeNull();
+    });
+  });
+
+  it('prunes drafts whose notes are missing from the loaded lists', async () => {
+    const orphanId = '99999999-9999-9999-9999-999999999999';
+    localStorage.setItem(
+      'keep_draft_' + orphanId,
+      JSON.stringify({ noteId: orphanId, title: 'Orphan', draftedAt: '2026-11-16T11:00:00.000Z', rejected: false })
+    );
+    const updateSpy = vi.spyOn(notesApi, 'updateNote');
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Active Note Item')).toBeDefined();
+      expect(localStorage.getItem('keep_draft_' + orphanId)).toBeNull();
+    });
+    expect(updateSpy).not.toHaveBeenCalled();
   });
 });

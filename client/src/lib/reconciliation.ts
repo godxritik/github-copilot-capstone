@@ -1,5 +1,21 @@
-import { notesApi, ApiError, type Note } from '../api/notesApi.js';
+import { notesApi, ApiError, type Note, type UpdateNotePayload } from '../api/notesApi.js';
 import type { NoteDraft } from '../hooks/useDrafts.js';
+
+export function draftToUpdatePayload(draft: NoteDraft): UpdateNotePayload {
+  return {
+    title: draft.title,
+    body: draft.body,
+    color: draft.color,
+    isPinned: draft.isPinned,
+    isArchived: draft.isArchived,
+    checklistItems: draft.checklistItems,
+  };
+}
+
+// Saves the draft to the server, overriding the newer server copy. Rejects on failure so the caller keeps the draft.
+export function applyDraftToServer(draft: NoteDraft): Promise<Note> {
+  return notesApi.updateNote(draft.noteId, draftToUpdatePayload(draft));
+}
 
 export type ReconciliationAction =
   | { type: 'APPLY_AND_SAVE'; draft: NoteDraft }

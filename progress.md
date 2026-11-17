@@ -65,7 +65,18 @@
 | **F-17** | Responsive & accessibility pass | **DONE** | Full Tailwind responsive breakpoints (`sm:`, `lg:`), semantic HTML, accessible `aria-label`s on all controls. |
 
 ### Testing Tasks (T-01 to T-06)
-- **T-01 to T-06**: PENDING (Vitest, Supertest, Playwright suites)
+- **T-01**: Covered by existing `client/tests/unit/palette.test.ts` (contrast ≥ 4.5:1 and client-server palette match).
+- **T-02**: DONE. Added Supertest cases to `server/tests/integration/api.test.ts` for N-11 normalization and checklist order, checklist replacement and 50-item limits, overflow rules (under 50 items, archived, conflicting retry, second continuation, duplicate ID, 200-code-point title truncation), delete relinking (middle, head, tail), and the 500 `INTERNAL_ERROR` envelope. `vitest run tests/integration/api.test.ts`: 40/40 pass (previously 24).
+- **T-03**: DONE. Added a 500-note filter case to `client/tests/unit/useNotes.test.ts` (checks count and < 300 ms). `vitest run` on that file: 8/8 pass. Machine: AMD Ryzen 5 230 w/ Radeon 760M Graphics, 31.3 GB RAM, Windows 11 Enterprise, Node v26.13.0.
+- **Code review finding 1 (Apply Draft)**: FIXED. "Apply Draft" now saves the draft via `applyDraftToServer` and discards the local draft only on success. Tests in `client/tests/unit/reconciliation.test.ts`. Client suite: 71/71 pass, `tsc --noEmit` clean.
+- **Code review finding 2 (draft restore in NoteCard)**: DONE. `NoteCard` restores a stored non-rejected draft on mount and clears its dirty flag once the server text matches the latest local text. Tests in `client/tests/unit/NoteCard.test.tsx` (7/7 pass). Client suite: 74/74 pass, `tsc --noEmit` clean. Rejected drafts are not restored; their Discard and Copy actions (A-13) remain open.
+- **Code review follow-ups (this pass)**:
+  - Reconciliation guard: `App.tsx` now runs draft reconciliation once per page load, after the first successful fetch (`reconciledRef`). Previously it re-ran on any change to the active-note count.
+  - App tests: 3 new cases in `client/tests/unit/App.test.tsx` cover auto-apply on load, the Apply Draft confirm path (P-07), and pruning of orphan drafts. Client suite: 77/77 pass; `tsc --noEmit` clean.
+  - Known limitation (not fixed): a draft rejected by the server (400 or `NOTE_ARCHIVED`) keeps the card's dirty flag set, so later server refreshes for that note are ignored for the session. Rejected drafts have no Discard or Copy UI yet (architecture A-13); fix in a separate approved task.
+  - `npm audit` (client and server): NOT RUN. The sandbox could not reach `registry.npmjs.org` (DNS error EAI_AGAIN). Re-run when network is available.
+- **T-04 to T-06**: PENDING (Playwright; verify phase is locked; needs install and browser-download approval)
+- **Code review report**: STALE. Needs a re-run of the code-review agent and human completion sign-off.
 
 ---
 

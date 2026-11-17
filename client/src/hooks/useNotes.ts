@@ -60,6 +60,7 @@ export function useNotes() {
   const [archivedNotes, setArchivedNotes] = useState<Note[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   const [searchQuery, setSearchQueryState] = useState<string>(() =>
     getSessionItem(SESSION_SEARCH_KEY, '')
@@ -109,6 +110,7 @@ export function useNotes() {
       ]);
       setActiveNotes(active);
       setArchivedNotes(archived);
+      setHasLoaded(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to fetch notes');
     } finally {
@@ -172,6 +174,7 @@ export function useNotes() {
     toggleColorFilter,
     clearFilters,
     refreshNotes: fetchNotes,
+    hasLoaded,
     removeNoteLocally,
     updateNoteLocally,
   };

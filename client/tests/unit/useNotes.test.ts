@@ -83,6 +83,28 @@ describe('useNotes and filterNotes (F-08, FR-03, FR-06, FR-08, FR-09)', () => {
       const noMatch = filterNotes(sampleNotes, 'science', ['teal']);
       expect(noMatch.length).toBe(0);
     });
+
+    it('filters 500 notes correctly within the 300 ms NFR-02 reference (T-03)', () => {
+      const palette = ['white', 'teal', 'red', 'green'] as const;
+      const largeSet: Note[] = Array.from({ length: 500 }, (_, i) => ({
+        ...sampleNotes[0],
+        id: `bulk-${i}`,
+        title: `Note ${i}`,
+        body: i % 5 === 0 ? `Body ${i} project` : `Body ${i}`,
+        color: palette[i % palette.length],
+      }));
+      const expected = largeSet.filter(
+        (n) => n.body.includes('project') && n.color === 'teal'
+      ).length;
+
+      const start = performance.now();
+      const result = filterNotes(largeSet, 'PROJECT', ['teal']);
+      const elapsed = performance.now() - start;
+
+      expect(expected).toBeGreaterThan(0);
+      expect(result.length).toBe(expected);
+      expect(elapsed).toBeLessThan(300);
+    });
   });
 
   describe('useNotes hook state & sessionStorage persistence', () => {

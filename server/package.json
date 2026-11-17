@@ -1,8 +1,8 @@
 {
     "scripts": {
-        "test:integration": "vitest server/tests/integration",
+        "test:integration": "vitest run tests/integration",
         "build": "tsc",
-        "test:unit": "vitest server/tests/unit",
+        "test:unit": "vitest run tests/unit",
         "test": "vitest",
         "start": "node dist/src/server.js",
         "dev": "tsx watch src/server.ts"

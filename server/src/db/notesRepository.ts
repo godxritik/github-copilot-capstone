@@ -208,24 +208,6 @@ export class NotesRepository {
     tx(noteId, items);
   }
 
-  /** Append one checklist item at the end of a note's list (used for overflow). */
-  appendChecklistItem(noteId: string, item: ChecklistItem): void {
-    const countRow = this.db
-      .prepare('SELECT COUNT(*) as count FROM checklist_items WHERE note_id = ?')
-      .get(noteId) as { count: number };
-    this.db
-      .prepare('INSERT INTO checklist_items (note_id, position, text, is_checked) VALUES (?, ?, ?, ?)')
-      .run(noteId, countRow.count, item.text, item.isChecked ? 1 : 0);
-  }
-
-  /** Count checklist items on a note. */
-  countChecklistItems(noteId: string): number {
-    const row = this.db
-      .prepare('SELECT COUNT(*) as count FROM checklist_items WHERE note_id = ?')
-      .get(noteId) as { count: number };
-    return row.count;
-  }
-
   /** Delete a note permanently. Checklist items cascade via the foreign key. */
   deleteById(id: string): void {
     this.db.prepare('DELETE FROM notes WHERE id = ?').run(id);

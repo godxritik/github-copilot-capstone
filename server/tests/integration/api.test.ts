@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+﻿import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import request from 'supertest';
 import path from 'path';
 import fs from 'fs';
@@ -248,6 +248,194 @@ describe('API Integration Tests (B-11, B-12, B-13)', () => {
     it('returns 404 NOT_FOUND when deleting non-existent note', async () => {
       const res = await request(app).delete('/api/notes/00000000-0000-0000-0000-000000000000');
       expect(res.status).toBe(404);
+    });
+  });
+
+  const makeItems = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ text: `Item ${i + 1}`, isChecked: false }));
+
+  describe('Repeated POST normalization and checklist order (N-11)', () => {
+    it('treats an omitted color as white on retry', async () => {
+      const id = 'd0000000-0000-0000-0000-000000000001';
+      await request(app).post('/api/notes').send({ id, title: 'Color' });
+
+      const res = await request(app).post('/api/notes').send({ id, title: 'Color', color: 'white' });
+      expect(res.status).toBe(200);
+    });
+
+    it('treats a reordered checklist as conflicting content', async () => {
+      const id = 'd0000000-0000-0000-0000-000000000002';
+      const a = { text: 'A', isChecked: false };
+      const b = { text: 'B', isChecked: false };
+      await request(app).post('/api/notes').send({ id, checklistItems: [a, b] });
+
+      const res = await request(app).post('/api/notes').send({ id, checklistItems: [b, a] });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+  });
+
+  describe('Checklist replacement and 50-item limit (B-10)', () => {
+    const id = 'c0000000-0000-0000-0000-000000000001';
+
+    beforeEach(async () => {
+      await request(app).post('/api/notes').send({ id, title: 'List', checklistItems: makeItems(2) });
+    });
+
+    it('PATCH replaces checklist items in the submitted order', async () => {
+      const next = [
+        { text: 'Second', isChecked: true },
+        { text: 'First', isChecked: false },
+      ];
+      const res = await request(app).patch(`/api/notes/${id}`).send({ checklistItems: next });
+      expect(res.status).toBe(200);
+      expect(res.body.checklistItems.map((i: { text: string; isChecked: boolean }) => ({ text: i.text, isChecked: i.isChecked }))).toEqual(next);
+    });
+
+    it('PATCH rejects more than 50 checklist items with VALIDATION_ERROR', async () => {
+      const res = await request(app).patch(`/api/notes/${id}`).send({ checklistItems: makeItems(51) });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('POST rejects more than 50 checklist items with VALIDATION_ERROR', async () => {
+      const res = await request(app)
+        .post('/api/notes')
+        .send({ id: 'c0000000-0000-0000-0000-000000000002', checklistItems: makeItems(51) });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('rejects checklist item text longer than 80 characters', async () => {
+      const res = await request(app)
+        .patch(`/api/notes/${id}`)
+        .send({ checklistItems: [{ text: 'x'.repeat(81), isChecked: false }] });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+  });
+
+  describe('Overflow rules (P-02, R3-01, B-08)', () => {
+    const origId = 'e0000000-0000-0000-0000-000000000001';
+    const overId = 'e0000000-0000-0000-0000-000000000002';
+    const newItem = { id: overId, text: 'Item 51', isChecked: false };
+
+    it('rejects overflow when the original has fewer than 50 items', async () => {
+      await request(app).post('/api/notes').send({ id: origId, title: 'Short', checklistItems: makeItems(49) });
+
+      const res = await request(app).post(`/api/notes/${origId}/overflow`).send(newItem);
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('rejects overflow from an archived original with NOTE_ARCHIVED', async () => {
+      await request(app).post('/api/notes').send({ id: origId, title: 'Big', checklistItems: makeItems(50) });
+      await request(app).patch(`/api/notes/${origId}`).send({ isArchived: true });
+
+      const res = await request(app).post(`/api/notes/${origId}/overflow`).send(newItem);
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('NOTE_ARCHIVED');
+    });
+
+    it('rejects a conflicting overflow retry with VALIDATION_ERROR', async () => {
+      await request(app).post('/api/notes').send({ id: origId, title: 'Big', checklistItems: makeItems(50) });
+      await request(app).post(`/api/notes/${origId}/overflow`).send(newItem);
+
+      const res = await request(app)
+        .post(`/api/notes/${origId}/overflow`)
+        .send({ id: overId, text: 'Different', isChecked: false });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('rejects a second continuation with a different ID', async () => {
+      await request(app).post('/api/notes').send({ id: origId, title: 'Big', checklistItems: makeItems(50) });
+      await request(app).post(`/api/notes/${origId}/overflow`).send(newItem);
+
+      const res = await request(app)
+        .post(`/api/notes/${origId}/overflow`)
+        .send({ id: 'e0000000-0000-0000-0000-000000000003', text: 'Other', isChecked: false });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('rejects an overflow ID already used by another note', async () => {
+      const otherId = 'e0000000-0000-0000-0000-000000000004';
+      await request(app).post('/api/notes').send({ id: otherId, title: 'Other' });
+      await request(app).post('/api/notes').send({ id: origId, title: 'Big', checklistItems: makeItems(50) });
+
+      const res = await request(app)
+        .post(`/api/notes/${origId}/overflow`)
+        .send({ id: otherId, text: 'Item 51', isChecked: false });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('truncates the overflow title to 200 code points', async () => {
+      await request(app).post('/api/notes').send({ id: origId, title: 'a'.repeat(200), checklistItems: makeItems(50) });
+
+      const res = await request(app).post(`/api/notes/${origId}/overflow`).send(newItem);
+      expect(res.status).toBe(201);
+      expect([...res.body.note.title].length).toBe(200);
+      expect(res.body.note.title.startsWith('Continued from aaa')).toBe(true);
+    });
+  });
+
+  describe('Delete with overflow relinking (B-09, N-08)', () => {
+    const headId = 'f0000000-0000-0000-0000-000000000001';
+    const midId = 'f0000000-0000-0000-0000-000000000002';
+    const tailId = 'f0000000-0000-0000-0000-000000000003';
+
+    // Builds head -> mid -> tail, each link created through the overflow endpoint.
+    const buildChain = async () => {
+      await request(app).post('/api/notes').send({ id: headId, title: 'Head', checklistItems: makeItems(50) });
+      await request(app)
+        .post(`/api/notes/${headId}/overflow`)
+        .send({ id: midId, text: 'Item 51', isChecked: false });
+      await request(app).patch(`/api/notes/${midId}`).send({ checklistItems: makeItems(50) });
+      await request(app)
+        .post(`/api/notes/${midId}/overflow`)
+        .send({ id: tailId, text: 'Item 51', isChecked: false });
+    };
+
+    it('deleting the middle note relinks head and tail', async () => {
+      await buildChain();
+      await request(app).delete(`/api/notes/${midId}`);
+
+      const head = await request(app).get(`/api/notes/${headId}`);
+      const tail = await request(app).get(`/api/notes/${tailId}`);
+      expect(head.body.continuedInId).toBe(tailId);
+      expect(tail.body.continuedFromId).toBe(headId);
+    });
+
+    it('deleting the head clears the tail back-link', async () => {
+      await buildChain();
+      await request(app).delete(`/api/notes/${headId}`);
+
+      const mid = await request(app).get(`/api/notes/${midId}`);
+      expect(mid.body.continuedFromId).toBeNull();
+    });
+
+    it('deleting the tail clears the middle forward-link', async () => {
+      await buildChain();
+      await request(app).delete(`/api/notes/${tailId}`);
+
+      const mid = await request(app).get(`/api/notes/${midId}`);
+      expect(mid.body.continuedInId).toBeNull();
+    });
+  });
+
+  describe('Error model for unexpected failures (NFR-12)', () => {
+    it('returns 500 INTERNAL_ERROR without exposing database details', async () => {
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      db.exec('ALTER TABLE notes RENAME TO notes_missing');
+
+      const res = await request(app).get('/api/notes?archived=false');
+      spy.mockRestore();
+
+      expect(res.status).toBe(500);
+      expect(res.body.error.code).toBe('INTERNAL_ERROR');
+      expect(JSON.stringify(res.body)).not.toMatch(/sqlite|notes_missing|no such table/i);
     });
   });
 

@@ -1,7 +1,47 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { reconcileDraftOnLoad } from '../../src/lib/reconciliation.js';
+import { reconcileDraftOnLoad, applyDraftToServer, draftToUpdatePayload } from '../../src/lib/reconciliation.js';
 import { notesApi, ApiError, type Note } from '../../src/api/notesApi.js';
 import type { NoteDraft } from '../../src/hooks/useDrafts.js';
+
+describe('Apply Draft to server (P-07 Apply Draft)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const draft: NoteDraft = {
+    noteId: 'n1',
+    title: 'Draft Title',
+    body: 'Draft Body',
+    color: 'blue',
+    isPinned: true,
+    isArchived: false,
+    checklistItems: [{ text: 'item', isChecked: false }],
+    draftedAt: '2026-01-01T00:00:00.000Z',
+    rejected: false,
+  };
+
+  it('saves draft content to the server and omits draft-only metadata', async () => {
+    const updateSpy = vi.spyOn(notesApi, 'updateNote').mockResolvedValue({} as Note);
+
+    await applyDraftToServer(draft);
+
+    expect(updateSpy).toHaveBeenCalledWith('n1', {
+      title: 'Draft Title',
+      body: 'Draft Body',
+      color: 'blue',
+      isPinned: true,
+      isArchived: false,
+      checklistItems: [{ text: 'item', isChecked: false }],
+    });
+    expect(draftToUpdatePayload(draft)).not.toHaveProperty('draftedAt');
+  });
+
+  it('rejects when the server save fails so the caller keeps the draft', async () => {
+    vi.spyOn(notesApi, 'updateNote').mockRejectedValue(new ApiError(500, 'API_ERROR', 'boom'));
+
+    await expect(applyDraftToServer(draft)).rejects.toBeInstanceOf(ApiError);
+  });
+});
 
 describe('Load Reconciliation (F-07, FR-12, P-07, R3-02)', () => {
   beforeEach(() => {

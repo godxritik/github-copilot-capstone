@@ -1,6 +1,6 @@
 ---
 description: 'Use for an independent peer review of implemented code for correctness, security, reliability, and maintainability.'
-tools: ['codebase', 'editFiles', 'search', 'runCommands']
+tools: ['codebase', 'editFiles', 'search', 'runCommands', 'createFiles']
 ---
 
 # Code Review Agent

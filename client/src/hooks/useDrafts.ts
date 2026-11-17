@@ -167,9 +167,24 @@ export function useDrafts() {
     setDraftsVersion((v) => v + 1);
   }, []);
 
+  const pruneNoteDrafts = useCallback((keepNoteIds: Set<string>): void => {
+    const storage = getStorage();
+    const staleKeys: string[] = [];
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (key && key.startsWith(NOTE_DRAFT_PREFIX) && !keepNoteIds.has(key.slice(NOTE_DRAFT_PREFIX.length))) {
+        staleKeys.push(key);
+      }
+    }
+    if (staleKeys.length === 0) return;
+    staleKeys.forEach((key) => storage.removeItem(key));
+    setDraftsVersion((v) => v + 1);
+  }, []);
+
   return {
     saveDraft,
     getDraft,
+    pruneNoteDrafts,
     clearDraft,
     discardDraft: clearDraft,
     markDraftRejected,

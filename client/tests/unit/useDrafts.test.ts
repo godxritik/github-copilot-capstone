@@ -120,4 +120,20 @@ describe('useDrafts Hook (F-05, FR-12, N-03, P-02)', () => {
 
     expect(result.current.getOverflowDraft('orig-1', 'over-1')).toBeNull();
   });
+
+  it('prunes note drafts whose note id is no longer present and keeps the rest', () => {
+    const { result } = renderHook(() => useDrafts());
+
+    act(() => {
+      result.current.saveDraft({ noteId: 'keep-me', title: 'Keep' });
+      result.current.saveDraft({ noteId: 'gone', title: 'Gone' });
+    });
+
+    act(() => {
+      result.current.pruneNoteDrafts(new Set(['keep-me']));
+    });
+
+    expect(result.current.getDraft('keep-me')).not.toBeNull();
+    expect(result.current.getDraft('gone')).toBeNull();
+  });
 });
