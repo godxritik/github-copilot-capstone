@@ -1,4 +1,4 @@
-# Code Review Report: Google Keep Notes (Web)
+# Code Review Report: Keep Notes (Web)
 
 Scope: `server/src/**`, `client/src/**`, and existing tests, reviewed against `docs/requirements.md`. Read-only review. No code was changed, and no tests were run.
 

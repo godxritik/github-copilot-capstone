@@ -189,7 +189,7 @@ export function NoteCard({
           <button
             type="button"
             onClick={() => onOpenNote?.(note.continuedFromId!)}
-            className="text-xs text-blue-700 hover:text-blue-900 underline flex items-center gap-1 font-medium"
+            className="text-xs text-forest hover:text-sage underline flex items-center gap-1 font-medium"
             aria-label="Open original note"
           >
             &larr; Continued from previous note
@@ -203,7 +203,7 @@ export function NoteCard({
           type="button"
           onClick={handleTogglePin}
           aria-label={note.isPinned ? 'Unpin note' : 'Pin note'}
-          className="absolute top-3 right-3 text-gray-500 hover:text-gray-800 p-1"
+          className="absolute top-3 right-3 text-forest/70 hover:text-forest p-1"
         >
           {note.isPinned ? '📌' : '📍'}
         </button>
@@ -211,7 +211,7 @@ export function NoteCard({
 
       {/* Inline title */}
       {isArchived ? (
-        <h3 className="text-base font-semibold text-gray-900 mb-1 pr-6 break-words">
+        <h3 className="text-base font-semibold text-forest mb-1 pr-6 break-words">
           {note.title || 'Untitled'}
         </h3>
       ) : (
@@ -223,13 +223,13 @@ export function NoteCard({
           onBlur={() => triggerBlurSave({ title, body })}
           placeholder="Title"
           aria-label="Note title"
-          className="w-full text-base font-semibold bg-transparent text-gray-900 placeholder-gray-400 focus:outline-none mb-1 pr-6"
+          className="w-full text-base font-semibold bg-transparent text-forest placeholder-sage focus:outline-none mb-1 pr-6"
         />
       )}
 
       {/* Inline body */}
       {isArchived ? (
-        <p className="text-sm text-gray-700 whitespace-pre-wrap break-words min-h-[1.5rem]">
+        <p className="text-sm text-forest/80 whitespace-pre-wrap break-words min-h-[1.5rem]">
           {note.body}
         </p>
       ) : (
@@ -241,7 +241,7 @@ export function NoteCard({
           placeholder="Take a note..."
           aria-label="Note body"
           rows={Math.max(2, body.split('\n').length)}
-          className="w-full text-sm bg-transparent text-gray-800 placeholder-gray-400 focus:outline-none resize-none"
+          className="w-full text-sm bg-transparent text-forest placeholder-sage focus:outline-none resize-none"
         />
       )}
 
@@ -258,7 +258,7 @@ export function NoteCard({
       />
 
       {/* Footer: timestamp and action buttons */}
-      <div className="flex items-center justify-between pt-3 mt-2 border-t border-black/5 text-xs text-gray-500">
+      <div className="flex items-center justify-between pt-3 mt-2 border-t border-black/5 text-xs text-forest/70">
         <span>{formatLocalTime(note.updatedAt)}</span>
 
         <div className="flex items-center gap-1 relative">
@@ -269,14 +269,14 @@ export function NoteCard({
                 type="button"
                 onClick={() => setShowColorPicker((prev) => !prev)}
                 aria-label="Change note color"
-                className="p-1 hover:bg-black/5 rounded text-gray-600"
+                className="p-1 hover:bg-black/5 rounded text-forest"
               >
                 🎨
               </button>
 
               {showColorPicker && (
                 <div
-                  className="absolute bottom-full mb-1 right-0 bg-white p-2 rounded-lg shadow-lg border border-gray-200 flex gap-1 z-30"
+                  className="absolute bottom-full mb-1 right-0 bg-cream p-2 rounded-lg shadow-lg border border-sand flex gap-1 z-30"
                   role="group"
                   aria-label="Color options"
                 >
@@ -286,7 +286,7 @@ export function NoteCard({
                       type="button"
                       onClick={() => handleChangeColor(c)}
                       aria-label={`Color ${PALETTE[c].name}`}
-                      className={`w-6 h-6 rounded-full border border-gray-300 ${PALETTE[c].bgClass} hover:scale-110 transition-transform`}
+                      className={`w-6 h-6 rounded-full border border-sand ${PALETTE[c].bgClass} hover:scale-110 transition-transform`}
                     />
                   ))}
                 </div>
@@ -298,8 +298,8 @@ export function NoteCard({
           <button
             type="button"
             onClick={handleToggleArchive}
-            aria-label={isArchived ? 'Unarchive note' : 'Archive note'}
-            className="p-1 hover:bg-black/5 rounded text-gray-600"
+            aria-label="Archive note"
+            className="p-1 hover:bg-black/5 rounded text-forest"
           >
             {isArchived ? '📥' : '📦'}
           </button>
@@ -309,7 +309,7 @@ export function NoteCard({
             type="button"
             onClick={() => setIsDeleteDialogOpen(true)}
             aria-label="Delete note"
-            className="p-1 hover:bg-black/5 rounded text-gray-600 hover:text-red-600"
+            className="p-1 hover:bg-black/5 rounded text-forest hover:text-red-600"
           >
             🗑️
           </button>

@@ -1,7 +1,7 @@
 {
   "$schema": "./approvals.schema.json",
   "version": "1.0",
-  "project": "Google Keep Notes (Web)",
+  "project": "Keep Notes (Web)",
   "pipeline": {
     "requireApprovalBetweenPhases": true,
     "allowAutoAdvance": false,

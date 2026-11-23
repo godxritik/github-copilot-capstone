@@ -1,7 +1,7 @@
-﻿# Verification Report — Google Keep Notes (Web)
+﻿# Verification Report — Keep Notes (Web)
 
 ## 1. Document Information
-- **Project Name:** Google Keep Notes (Web)
+- **Project Name:** Keep Notes (Web)
 - **Phase:** Verification (QA & Test Execution)
 - **Date:** 2026-11-17
 - **QA Role:** Senior QA Engineer

@@ -1,7 +1,7 @@
-# Implementation Plan: Google Keep Notes (Web)
+# Implementation Plan: Keep Notes (Web)
 
 ## 1. Document Info
-- **Project:** Google Keep Notes (Web)
+- **Project:** Keep Notes (Web)
 - **Version:** 1.1 (derived from architecture v0.6, design review Section 7.13, requirements v0.8)
 - **Date:** 2026-11-16
 - **Status:** Completed. Planning v1.1 approved by the user on 2026-11-16 ("mark it completed"). Open items are recorded in Section 6. Implementation starts only after per-task approval, beginning with B-01.

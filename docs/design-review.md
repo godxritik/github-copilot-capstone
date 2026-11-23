@@ -1,4 +1,4 @@
-﻿# Design Review: Google Keep Notes (Web)
+﻿# Design Review: Keep Notes (Web)
 
 ## 1. Document Info
 - **Reviewed documents:** `docs/architecture.md` (v0.1 review; round 2 re-check of the saved v0.2, see Section 7) and `docs/requirements.md` v0.8

@@ -90,22 +90,22 @@ export default function App() {
   const isFiltered = searchQuery.trim().length > 0 || selectedColors.length > 0;
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
+    <div className="min-h-screen bg-cream flex flex-col">
       {/* Top Navbar */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+      <header className="bg-forest text-cream border-b border-sand sticky top-0 z-40 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
-            <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-              <span className="text-yellow-500 text-2xl">📝</span> Keep Notes
+            <h1 className="text-xl font-bold text-cream flex items-center gap-2">
+              <span className="text-sand text-2xl">📝</span> Keep Notes
             </h1>
 
             {/* Navigation Tabs */}
-            <nav className="flex rounded-lg bg-gray-100 p-1" aria-label="Views">
+            <nav className="flex rounded-lg bg-sage/40 p-1" aria-label="Views">
               <button
                 type="button"
                 onClick={() => setActiveTab('active')}
                 className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-                  activeTab === 'active' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                  activeTab === 'active' ? 'bg-cream text-forest shadow-sm' : 'text-cream/80 hover:text-cream'
                 }`}
               >
                 Notes
@@ -114,7 +114,7 @@ export default function App() {
                 type="button"
                 onClick={() => setActiveTab('archived')}
                 className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-                  activeTab === 'archived' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                  activeTab === 'archived' ? 'bg-cream text-forest shadow-sm' : 'text-cream/80 hover:text-cream'
                 }`}
               >
                 Archive
@@ -131,7 +131,7 @@ export default function App() {
         </div>
 
         {/* Color Filters */}
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-gray-100">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-sage/40">
           <ColorFilter
             selectedColors={selectedColors}
             onToggleColor={toggleColorFilter}
