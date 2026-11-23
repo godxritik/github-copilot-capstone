@@ -40,7 +40,7 @@ export function NoteList({
     <div className="space-y-8">
       {pinnedNotes.length > 0 && (
         <section aria-labelledby="pinned-heading">
-          <h2 id="pinned-heading" className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+          <h2 id="pinned-heading" className="text-xs font-semibold text-forest/70 uppercase tracking-wider mb-3">
             Pinned
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -61,7 +61,7 @@ export function NoteList({
       {otherNotes.length > 0 && (
         <section aria-labelledby={pinnedNotes.length > 0 ? 'others-heading' : undefined}>
           {pinnedNotes.length > 0 && (
-            <h2 id="others-heading" className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+            <h2 id="others-heading" className="text-xs font-semibold text-forest/70 uppercase tracking-wider mb-3">
               Others
             </h2>
           )}

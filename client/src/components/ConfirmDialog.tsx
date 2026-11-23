@@ -71,17 +71,17 @@ export function ConfirmDialog({
       aria-labelledby="dialog-title"
       ref={dialogRef}
     >
-      <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-6 animate-scale-in">
-        <h2 id="dialog-title" className="text-lg font-semibold text-gray-900 mb-2">
+      <div className="bg-cream border border-sand rounded-lg shadow-xl max-w-sm w-full p-6 animate-scale-in">
+        <h2 id="dialog-title" className="text-lg font-semibold text-forest mb-2">
           {title}
         </h2>
-        <p className="text-sm text-gray-600 mb-6">{message}</p>
+        <p className="text-sm text-forest/80 mb-6">{message}</p>
         <div className="flex justify-end gap-3">
           <button
             ref={cancelButtonRef}
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400"
+            className="px-4 py-2 text-sm font-medium text-forest bg-sand/40 hover:bg-sand/70 rounded-md focus:outline-none focus:ring-2 focus:ring-sand"
           >
             {cancelLabel}
           </button>

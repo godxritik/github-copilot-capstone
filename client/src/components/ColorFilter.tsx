@@ -9,7 +9,7 @@ export interface ColorFilterProps {
 export function ColorFilter({ selectedColors, onToggleColor, onClearColors }: ColorFilterProps) {
   return (
     <div className="flex items-center gap-2 flex-wrap py-2" role="group" aria-label="Color filters">
-      <span className="text-xs font-medium text-gray-500 mr-1">Filter by color:</span>
+      <span className="text-xs font-medium text-white mr-1">Filter by color:</span>
       {PALETTE_COLORS.map((color) => {
         const isSelected = selectedColors.includes(color);
         return (
@@ -20,7 +20,7 @@ export function ColorFilter({ selectedColors, onToggleColor, onClearColors }: Co
             aria-label={`Filter by ${PALETTE[color].name}`}
             aria-pressed={isSelected}
             className={`w-6 h-6 rounded-full border transition-all ${PALETTE[color].bgClass} ${
-              isSelected ? 'ring-2 ring-gray-800 scale-110 border-gray-800' : 'border-gray-300 hover:scale-105'
+              isSelected ? 'ring-2 ring-white scale-110 border-white' : 'border-sand hover:scale-105'
             }`}
           />
         );
@@ -30,7 +30,7 @@ export function ColorFilter({ selectedColors, onToggleColor, onClearColors }: Co
           type="button"
           onClick={onClearColors}
           aria-label="Clear color filter"
-          className="text-xs text-gray-500 hover:text-gray-800 underline ml-1"
+          className="text-xs text-white hover:text-sand underline ml-1"
         >
           Clear
         </button>

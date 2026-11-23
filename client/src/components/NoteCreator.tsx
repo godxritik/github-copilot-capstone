@@ -71,7 +71,7 @@ export function NoteCreator({ onNoteCreated, showToast }: NoteCreatorProps) {
       <div className="max-w-xl mx-auto mb-8">
         <div
           onClick={() => setIsExpanded(true)}
-          className="bg-white rounded-lg shadow-sm border border-gray-300 p-3 px-4 flex items-center justify-between cursor-text hover:shadow transition-shadow"
+          className="bg-cream rounded-lg shadow-sm border border-sand p-3 px-4 flex items-center justify-between cursor-text hover:shadow transition-shadow"
           role="button"
           tabIndex={0}
           onKeyDown={(e) => {
@@ -82,7 +82,7 @@ export function NoteCreator({ onNoteCreated, showToast }: NoteCreatorProps) {
           }}
           aria-label="Create new note"
         >
-          <span className="text-gray-500 text-sm font-medium">Take a note...</span>
+          <span className="text-forest/70 text-sm font-medium">Take a note...</span>
           <button
             type="button"
             onClick={(e) => {
@@ -91,7 +91,7 @@ export function NoteCreator({ onNoteCreated, showToast }: NoteCreatorProps) {
               setChecklistItems([{ text: '', isChecked: false }]);
             }}
             aria-label="New checklist"
-            className="text-gray-500 hover:text-gray-800 p-1"
+            className="text-forest/70 hover:text-forest p-1"
           >
             ☑️
           </button>
@@ -110,7 +110,7 @@ export function NoteCreator({ onNoteCreated, showToast }: NoteCreatorProps) {
           placeholder="Title"
           aria-label="New note title"
           autoFocus
-          className="w-full text-base font-semibold bg-transparent text-gray-900 placeholder-gray-400 focus:outline-none mb-2"
+          className="w-full text-base font-semibold bg-transparent text-forest placeholder-sage focus:outline-none mb-2"
         />
 
         <textarea
@@ -119,7 +119,7 @@ export function NoteCreator({ onNoteCreated, showToast }: NoteCreatorProps) {
           placeholder="Take a note..."
           aria-label="New note body"
           rows={3}
-          className="w-full text-sm bg-transparent text-gray-800 placeholder-gray-400 focus:outline-none resize-none mb-2"
+          className="w-full text-sm bg-transparent text-forest placeholder-sage focus:outline-none resize-none mb-2"
         />
 
         {checklistItems.length > 0 && (
@@ -137,14 +137,14 @@ export function NoteCreator({ onNoteCreated, showToast }: NoteCreatorProps) {
               type="button"
               onClick={() => setShowColorPicker((prev) => !prev)}
               aria-label="Note color"
-              className="p-1 hover:bg-black/5 rounded text-gray-600"
+              className="p-1 hover:bg-black/5 rounded text-forest"
             >
               🎨
             </button>
 
             {showColorPicker && (
               <div
-                className="absolute bottom-full mb-1 left-0 bg-white p-2 rounded-lg shadow-lg border border-gray-200 flex gap-1 z-30"
+                className="absolute bottom-full mb-1 left-0 bg-cream p-2 rounded-lg shadow-lg border border-sand flex gap-1 z-30"
                 role="group"
                 aria-label="Color options"
               >
@@ -157,7 +157,7 @@ export function NoteCreator({ onNoteCreated, showToast }: NoteCreatorProps) {
                       setShowColorPicker(false);
                     }}
                     aria-label={`Color ${PALETTE[c].name}`}
-                    className={`w-6 h-6 rounded-full border border-gray-300 ${PALETTE[c].bgClass} hover:scale-110 transition-transform`}
+                    className={`w-6 h-6 rounded-full border border-sand ${PALETTE[c].bgClass} hover:scale-110 transition-transform`}
                   />
                 ))}
               </div>
@@ -168,7 +168,7 @@ export function NoteCreator({ onNoteCreated, showToast }: NoteCreatorProps) {
             type="button"
             disabled={isSubmitting}
             onClick={handleClose}
-            className="px-4 py-1.5 text-sm font-medium text-gray-800 bg-black/5 hover:bg-black/10 rounded-md transition-colors"
+            className="px-4 py-1.5 text-sm font-medium text-forest bg-sand/40 hover:bg-sand/70 rounded-md transition-colors"
           >
             {isSubmitting ? 'Saving...' : 'Close'}
           </button>

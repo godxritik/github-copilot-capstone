@@ -2,6 +2,12 @@
 
 All notable changes to the Keep Notes (Web) project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+- **Custom Color Theme:** Frontend uses the project palette (`#1E3B2F` forest, `#7F8C6A` sage, `#C8B48A` sand, `#F5F0E6` cream), defined in `client/tailwind.config.js` and applied across `App.tsx` and the note, filter, dialog, and toast components.
+- **Filter by Color Visibility:** The "Filter by color" label and Clear link are white on the forest header, and the selected swatch ring is white.
+
 ## [1.0.0-mvp] - 2026-11-17
 
 ### Added

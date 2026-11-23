@@ -28,14 +28,14 @@ export function Toast({
     <div
       aria-live="polite"
       role="status"
-      className="fixed bottom-4 right-4 z-50 flex items-center gap-3 bg-gray-900 text-white px-4 py-3 rounded-lg shadow-lg text-sm max-w-md animate-fade-in"
+      className="fixed bottom-4 right-4 z-50 flex items-center gap-3 bg-forest text-cream px-4 py-3 rounded-lg shadow-lg text-sm max-w-md animate-fade-in"
     >
       <span className="flex-1">{message}</span>
       {actionText && onAction && (
         <button
           type="button"
           onClick={onAction}
-          className="text-yellow-400 hover:text-yellow-300 font-medium underline px-1"
+          className="text-sand hover:text-cream font-medium underline px-1"
         >
           {actionText}
         </button>
@@ -44,7 +44,7 @@ export function Toast({
         <button
           type="button"
           onClick={onSecondaryAction}
-          className="text-blue-300 hover:text-blue-200 font-medium underline px-1"
+          className="text-sand hover:text-cream font-medium underline px-1"
         >
           {secondaryActionText}
         </button>
@@ -54,7 +54,7 @@ export function Toast({
           type="button"
           onClick={onClose}
           aria-label="Close notification"
-          className="text-gray-400 hover:text-white font-bold ml-1"
+          className="text-sage hover:text-cream font-bold ml-1"
         >
           &times;
         </button>
